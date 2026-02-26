@@ -1,0 +1,26 @@
+[
+  {
+    "name": "PostgreSQL",
+    "target_host": "postgres",
+    "target_port": 5432,
+    "description": "PostgreSQL database server"
+  },
+  {
+    "name": "MySQL",
+    "target_host": "mysql",
+    "target_port": 3306,
+    "description": "MySQL / MariaDB database server"
+  },
+  {
+    "name": "Redis",
+    "target_host": "redis",
+    "target_port": 6379,
+    "description": "Redis in-memory data store"
+  },
+  {
+    "name": "MongoDB",
+    "target_host": "mongodb",
+    "target_port": 27017,
+    "description": "MongoDB NoSQL database"
+  }
+]

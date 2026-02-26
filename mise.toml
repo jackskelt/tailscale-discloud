@@ -1,0 +1,41 @@
+[tools]
+"rust" = { version = "1.93", targets = "x86_64-unknown-linux-musl,x86_64-unknown-linux-gnu" }
+
+[tasks.build]
+description = "Build the API binary for x86_64-unknown-linux-musl"
+run = "cargo build --release --target x86_64-unknown-linux-musl"
+
+[tasks.package]
+description = "Create deploy package"
+depends = ["build"]
+run = """
+rm -rf dist
+mkdir -p dist/public
+cp target/x86_64-unknown-linux-musl/release/api dist/api
+cp start.sh dist/start.sh
+cp -r public/ dist/
+cp Dockerfile dist/Dockerfile
+cp discloud.config dist/discloud.config
+chmod +x dist/api dist/start.sh
+sed -i 's|ARG BUILD_SOURCE=remote|ARG BUILD_SOURCE=local|' dist/Dockerfile
+sed -i 's|# APP_FILES|COPY api /home/tailscale/api\\nCOPY start.sh /home/tailscale/start.sh\\nCOPY public/ /home/tailscale/public/|' dist/Dockerfile
+echo "[package] dist/ created successfully"
+ls -la dist/
+"""
+
+[tasks.zip]
+description = "Create release.zip ready for deployment"
+depends = ["package"]
+run = """
+cd dist && zip -r release.zip Dockerfile discloud.config api start.sh public/
+echo "[zip] dist/release.zip created successfully"
+ls -lh release.zip
+"""
+
+[tasks.clean]
+description = "Remove build artifacts and dist directory"
+run = """
+rm -rf dist
+cargo clean
+echo "[clean] Cleaned dist/ and cargo artifacts"
+"""

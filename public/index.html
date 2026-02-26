@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Tailscale Tunnel Manager</title>
+        <link rel="stylesheet" href="/style.css" />
+        <link rel="icon" href="icon.webp" />
+    </head>
+    <body>
+        <div id="app" class="app">
+            <!-- ═══ Header ═══ -->
+            <header class="header">
+                <div class="header-inner">
+                    <div class="header-brand">
+                        <div class="header-logo">
+                            <img
+                                src="icon.webp"
+                                alt="Logo"
+                                style="width: 35px; height: 35px"
+                            />
+                        </div>
+                        <div>
+                            <h1 class="header-title" data-i18n="header.title">
+                                Tunnel Manager
+                            </h1>
+                            <p
+                                class="header-subtitle"
+                                data-i18n="header.subtitle"
+                            >
+                                Manage TCP tunnels via Tailscale
+                            </p>
+                        </div>
+                    </div>
+                    <div class="header-controls">
+                        <!-- Refresh Button -->
+                        <button
+                            class="btn btn-ghost btn-sm"
+                            id="refresh-btn"
+                            title="Refresh"
+                            data-i18n-title="actions.refresh"
+                        >
+                            <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <polyline points="23 4 23 10 17 10" />
+                                <polyline points="1 20 1 14 7 14" />
+                                <path
+                                    d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"
+                                />
+                            </svg>
+                        </button>
+
+                        <!-- Theme Toggle -->
+                        <button
+                            class="theme-toggle"
+                            id="theme-toggle"
+                            title="Toggle theme"
+                            data-i18n-title="theme.toggle"
+                        >
+                            <svg
+                                class="icon-sun"
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <circle cx="12" cy="12" r="5" />
+                                <line x1="12" y1="1" x2="12" y2="3" />
+                                <line x1="12" y1="21" x2="12" y2="23" />
+                                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                                <line
+                                    x1="18.36"
+                                    y1="18.36"
+                                    x2="19.78"
+                                    y2="19.78"
+                                />
+                                <line x1="1" y1="12" x2="3" y2="12" />
+                                <line x1="21" y1="12" x2="23" y2="12" />
+                                <line
+                                    x1="4.22"
+                                    y1="19.78"
+                                    x2="5.64"
+                                    y2="18.36"
+                                />
+                                <line
+                                    x1="18.36"
+                                    y1="5.64"
+                                    x2="19.78"
+                                    y2="4.22"
+                                />
+                            </svg>
+                            <svg
+                                class="icon-moon"
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path
+                                    d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
+                                />
+                            </svg>
+                        </button>
+
+                        <!-- Language Selector -->
+                        <div class="lang-selector" id="lang-selector">
+                            <button class="lang-btn" id="lang-btn">
+                                <span class="lang-flag" id="lang-current-flag"
+                                    >🇺🇸</span
+                                >
+                                <span class="lang-name" id="lang-current-name"
+                                    >EN</span
+                                >
+                                <svg
+                                    class="lang-chevron"
+                                    width="12"
+                                    height="12"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2.5"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <polyline points="6 9 12 15 18 9" />
+                                </svg>
+                            </button>
+                            <div class="lang-dropdown" id="lang-dropdown">
+                                <!-- Populated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- ═══ Main Content ═══ -->
+            <main class="main">
+                <!-- Stats Row -->
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <div class="stat-label" data-i18n="stats.total">
+                            Total Tunnels
+                        </div>
+                        <div class="stat-value" id="stat-total">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label" data-i18n="stats.active">
+                            Active
+                        </div>
+                        <div class="stat-value text-green" id="stat-active">
+                            0
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label" data-i18n="stats.inactive">
+                            Inactive
+                        </div>
+                        <div class="stat-value text-muted" id="stat-inactive">
+                            0
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ═══ Create Tunnel Card ═══ -->
+                <section class="card section">
+                    <div class="card-header">
+                        <h2 class="card-title" id="form-title">
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <circle cx="12" cy="12" r="10" />
+                                <line x1="12" y1="8" x2="12" y2="16" />
+                                <line x1="8" y1="12" x2="16" y2="12" />
+                            </svg>
+                            <span data-i18n="form.title.create"
+                                >New Tunnel</span
+                            >
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        <!-- Suggestions -->
+                        <div
+                            class="suggestions-section"
+                            id="suggestions-section"
+                        >
+                            <p
+                                class="suggestions-title"
+                                data-i18n="suggestions.title"
+                            >
+                                Quick Start Templates
+                            </p>
+                            <div
+                                class="suggestions-grid"
+                                id="suggestions-grid"
+                            ></div>
+                        </div>
+
+                        <!-- Form -->
+                        <form id="tunnel-form" autocomplete="off">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label
+                                        class="form-label"
+                                        for="input-name"
+                                        data-i18n="form.label.name"
+                                        >Name</label
+                                    >
+                                    <input
+                                        class="form-input"
+                                        type="text"
+                                        id="input-name"
+                                        data-i18n-placeholder="form.placeholder.name"
+                                        placeholder="e.g. My Database"
+                                        required
+                                    />
+                                    <span
+                                        class="form-hint"
+                                        data-i18n="form.help.name"
+                                        >A friendly label for this tunnel.</span
+                                    >
+                                </div>
+                                <div class="form-group">
+                                    <label
+                                        class="form-label"
+                                        for="input-local-port"
+                                        data-i18n="form.label.localPort"
+                                        >Local Port</label
+                                    >
+                                    <input
+                                        class="form-input"
+                                        type="number"
+                                        id="input-local-port"
+                                        min="1"
+                                        max="65535"
+                                        data-i18n-placeholder="form.placeholder.localPort"
+                                        placeholder="e.g. 5432"
+                                        required
+                                    />
+                                    <span
+                                        class="form-hint"
+                                        data-i18n="form.help.localPort"
+                                        >The port on this machine that will
+                                        accept connections.</span
+                                    >
+                                </div>
+                                <div class="form-group">
+                                    <label
+                                        class="form-label"
+                                        for="input-target-host"
+                                        data-i18n="form.label.targetHost"
+                                        >Target Host</label
+                                    >
+                                    <input
+                                        class="form-input"
+                                        type="text"
+                                        id="input-target-host"
+                                        data-i18n-placeholder="form.placeholder.targetHost"
+                                        placeholder="e.g. 10.0.0.5"
+                                        required
+                                    />
+                                    <span
+                                        class="form-hint"
+                                        data-i18n="form.help.targetHost"
+                                        >The host to forward traffic to (IP or
+                                        hostname).</span
+                                    >
+                                </div>
+                                <div class="form-group">
+                                    <label
+                                        class="form-label"
+                                        for="input-target-port"
+                                        data-i18n="form.label.targetPort"
+                                        >Target Port</label
+                                    >
+                                    <input
+                                        class="form-input"
+                                        type="number"
+                                        id="input-target-port"
+                                        min="1"
+                                        max="65535"
+                                        data-i18n-placeholder="form.placeholder.targetPort"
+                                        placeholder="e.g. 5432"
+                                        required
+                                    />
+                                    <span
+                                        class="form-hint"
+                                        data-i18n="form.help.targetPort"
+                                        >The port on the target host.</span
+                                    >
+                                </div>
+                            </div>
+
+                            <div class="form-group form-toggle-group">
+                                <label class="toggle-label">
+                                    <span data-i18n="form.label.enabled"
+                                        >Start enabled</span
+                                    >
+                                    <div class="toggle-switch">
+                                        <input
+                                            type="checkbox"
+                                            id="input-enabled"
+                                            checked
+                                        />
+                                        <span class="toggle-slider"></span>
+                                    </div>
+                                </label>
+                            </div>
+
+                            <div class="form-actions">
+                                <button
+                                    type="button"
+                                    class="btn btn-secondary"
+                                    id="form-cancel-btn"
+                                    style="display: none"
+                                    data-i18n="form.btn.cancel"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    class="btn btn-primary"
+                                    id="form-submit-btn"
+                                >
+                                    <svg
+                                        width="16"
+                                        height="16"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        stroke-width="2"
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                    >
+                                        <line x1="12" y1="5" x2="12" y2="19" />
+                                        <line x1="5" y1="12" x2="19" y2="12" />
+                                    </svg>
+                                    <span data-i18n="form.btn.create"
+                                        >Create Tunnel</span
+                                    >
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- ═══ Tunnels List Card ═══ -->
+                <section class="card section">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <rect
+                                    x="2"
+                                    y="3"
+                                    width="20"
+                                    height="14"
+                                    rx="2"
+                                    ry="2"
+                                />
+                                <line x1="8" y1="21" x2="16" y2="21" />
+                                <line x1="12" y1="17" x2="12" y2="21" />
+                            </svg>
+                            <span data-i18n="tunnels.title"
+                                >Active Tunnels</span
+                            >
+                        </h2>
+                    </div>
+                    <div class="card-body card-body-flush">
+                        <!-- Empty State -->
+                        <div class="empty-state" id="empty-state">
+                            <div class="empty-state-icon">
+                                <svg
+                                    width="48"
+                                    height="48"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="1.5"
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                >
+                                    <path
+                                        d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"
+                                    />
+                                    <path
+                                        d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"
+                                    />
+                                </svg>
+                            </div>
+                            <h3
+                                class="empty-state-title"
+                                data-i18n="tunnels.empty.title"
+                            >
+                                No tunnels yet
+                            </h3>
+                            <p
+                                class="empty-state-text"
+                                data-i18n="tunnels.empty.text"
+                            >
+                                Create your first TCP tunnel using the form
+                                above to get started.
+                            </p>
+                        </div>
+
+                        <!-- Tunnel Table -->
+                        <div
+                            class="table-container"
+                            id="table-container"
+                            style="display: none"
+                        >
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th data-i18n="tunnels.col.status">
+                                            Status
+                                        </th>
+                                        <th data-i18n="tunnels.col.name">
+                                            Name
+                                        </th>
+                                        <th data-i18n="tunnels.col.localPort">
+                                            Local Port
+                                        </th>
+                                        <th data-i18n="tunnels.col.target">
+                                            Target
+                                        </th>
+                                        <th data-i18n="tunnels.col.connection">
+                                            Connection
+                                        </th>
+                                        <th
+                                            style="text-align: right"
+                                            data-i18n="tunnels.col.actions"
+                                        >
+                                            Actions
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tunnels-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </main>
+
+            <!-- ═══ Test Connection Modal ═══ -->
+            <div class="modal-overlay" id="test-overlay">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3 class="modal-title" id="test-modal-title">
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                <polyline points="22 4 12 14.01 9 11.01" />
+                            </svg>
+                            <span data-i18n="test.modal.title"
+                                >Connection Test</span
+                            >
+                        </h3>
+                        <button
+                            class="btn btn-ghost btn-icon"
+                            id="test-modal-close"
+                            title="Close"
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="test-result-container"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button
+                            class="btn btn-secondary"
+                            id="test-modal-done"
+                            data-i18n="test.modal.done"
+                        >
+                            Done
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ Edit Tunnel Modal ═══ -->
+            <div class="modal-overlay" id="edit-overlay">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3 class="modal-title">
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <path
+                                    d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"
+                                />
+                                <path
+                                    d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"
+                                />
+                            </svg>
+                            <span data-i18n="form.title.edit">Edit Tunnel</span>
+                        </h3>
+                        <button
+                            class="btn btn-ghost btn-icon"
+                            id="edit-modal-close"
+                            title="Close"
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="edit-form" autocomplete="off">
+                            <input type="hidden" id="edit-id" />
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label
+                                        class="form-label"
+                                        for="edit-name"
+                                        data-i18n="form.label.name"
+                                        >Name</label
+                                    >
+                                    <input
+                                        class="form-input"
+                                        type="text"
+                                        id="edit-name"
+                                        required
+                                    />
+                                </div>
+                                <div class="form-group">
+                                    <label
+                                        class="form-label"
+                                        for="edit-local-port"
+                                        data-i18n="form.label.localPort"
+                                        >Local Port</label
+                                    >
+                                    <input
+                                        class="form-input"
+                                        type="number"
+                                        id="edit-local-port"
+                                        min="1"
+                                        max="65535"
+                                        required
+                                    />
+                                </div>
+                                <div class="form-group">
+                                    <label
+                                        class="form-label"
+                                        for="edit-target-host"
+                                        data-i18n="form.label.targetHost"
+                                        >Target Host</label
+                                    >
+                                    <input
+                                        class="form-input"
+                                        type="text"
+                                        id="edit-target-host"
+                                        required
+                                    />
+                                </div>
+                                <div class="form-group">
+                                    <label
+                                        class="form-label"
+                                        for="edit-target-port"
+                                        data-i18n="form.label.targetPort"
+                                        >Target Port</label
+                                    >
+                                    <input
+                                        class="form-input"
+                                        type="number"
+                                        id="edit-target-port"
+                                        min="1"
+                                        max="65535"
+                                        required
+                                    />
+                                </div>
+                            </div>
+                            <div class="form-group form-toggle-group">
+                                <label class="toggle-label">
+                                    <span data-i18n="form.label.enabledEdit"
+                                        >Enabled</span
+                                    >
+                                    <div class="toggle-switch">
+                                        <input
+                                            type="checkbox"
+                                            id="edit-enabled"
+                                        />
+                                        <span class="toggle-slider"></span>
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="form-actions">
+                                <button
+                                    type="button"
+                                    class="btn btn-secondary"
+                                    id="edit-cancel-btn"
+                                    data-i18n="form.btn.cancel"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    class="btn btn-primary"
+                                    id="edit-submit-btn"
+                                >
+                                    <span data-i18n="form.btn.update"
+                                        >Save Changes</span
+                                    >
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ Footer ═══ -->
+            <footer class="app-footer">
+                <div class="footer-inner">
+                    <p class="footer-disclaimer" data-i18n="footer.disclaimer">
+                        This project is not affiliated with, endorsed by, or
+                        associated with Tailscale Inc. or the Tailscale brand in
+                        any way. "Tailscale" is a registered trademark of
+                        Tailscale Inc.
+                    </p>
+                    <p class="footer-links">
+                        <a
+                            href="https://github.com/discloud/tailscale-discloud"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="footer-link"
+                        >
+                            <svg
+                                width="16"
+                                height="16"
+                                viewBox="0 0 16 16"
+                                fill="currentColor"
+                            >
+                                <path
+                                    d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"
+                                />
+                            </svg>
+                            <span>GitHub</span>
+                        </a>
+                    </p>
+                </div>
+            </footer>
+
+            <!-- ═══ Toast Container ═══ -->
+            <div class="toast-container" id="toast-container"></div>
+        </div>
+
+        <script src="/app.js"></script>
+    </body>
+</html>
