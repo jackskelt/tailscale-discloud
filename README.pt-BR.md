@@ -101,6 +101,7 @@ NAME=Tailscale
 AVATAR=https://tailscale.com/favicon.png
 MAIN=Dockerfile
 RAM=100
+VLAN=true
 ```
 
 Leia [DISCLOUD.md](./DISCLOUD.md) para instruções detalhadas de deploy.

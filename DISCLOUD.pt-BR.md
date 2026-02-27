@@ -46,7 +46,7 @@ O principal caso de uso é rodar o gerenciador em um container na Discloud para 
    4. [Encontrar o link de login do Tailscale](#24-encontrar-o-link-de-login-do-tailscale)
    5. [Autorizar o nó](#25-autorizar-o-nó)
    6. [Verificar a máquina no Tailscale](#26-verificar-a-máquina-no-tailscale)
-   7. [Ativar a VLAN na Discloud](#27-ativar-a-vlan-na-discloud)
+   7. [Verificar se a VLAN está ativa na Discloud](#27-verificar-se-a-vlan-está-ativa-na-discloud)
    8. [Acessar o painel web](#28-acessar-o-painel-web)
 3. [Utilização — Criando seu primeiro túnel](#3-utilização--criando-seu-primeiro-túnel)
    1. [Hospedar uma instância MySQL a partir de um template](#31-hospedar-uma-instância-mysql-a-partir-de-um-template)
@@ -136,9 +136,9 @@ Volte ao console de administração do Tailscale em [https://login.tailscale.com
 
 ![Console de administração do Tailscale mostrando a máquina tailscale-discloud na lista de Machines](images/deploy/tailscale-machines-discloud.png)
 
-#### 2.7 Ativar a VLAN na Discloud
+#### 2.7 Verificar se a VLAN está ativa na Discloud
 
-Vá nas **Configurações** da aplicação Tailscale Tunnel Manager na dashboard da Discloud. Encontre a seção **VLAN**, **ative-a** e clique em **Salvar**.
+Vá nas **Configurações** da aplicação Tailscale Tunnel Manager na dashboard da Discloud. Encontre a seção **VLAN** e verifique se está ativada.
 
 Isso permite que o container do Tailscale se comunique com outras aplicações na mesma conta da Discloud pela rede interna.
 

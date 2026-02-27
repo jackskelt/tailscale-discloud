@@ -46,7 +46,7 @@ The primary use case is running the manager on a Discloud container so that serv
    4. [Find the Tailscale login link](#24-find-the-tailscale-login-link)
    5. [Authorize the node](#25-authorize-the-node)
    6. [Verify the machine on Tailscale](#26-verify-the-machine-on-tailscale)
-   7. [Enable VLAN on Discloud](#27-enable-vlan-on-discloud)
+   7. [Verify if VLAN is enabledon Discloud](#27-verify-if-vlan-is-enabled-on-discloud)
    8. [Access the web dashboard](#28-access-the-web-dashboard)
 3. [Usage — Creating your first tunnel](#3-usage--creating-your-first-tunnel)
    1. [Deploy a MySQL instance from a template](#31-deploy-a-mysql-instance-from-a-template)
@@ -136,9 +136,9 @@ Go back to the Tailscale admin console at [https://login.tailscale.com/admin/mac
 
 ![Tailscale admin console showing the tailscale-discloud machine in the Machines list](images/deploy/tailscale-machines-discloud.png)
 
-#### 2.7 Enable VLAN on Discloud
+#### 2.7 Verify if VLAN is enabled on Discloud
 
-Go to the **Settings** of the Tailscale Tunnel Manager application on the Discloud dashboard. Find the **VLAN** section, **enable it**, and click **Save**.
+Go to the **Settings** of the Tailscale Tunnel Manager application on the Discloud dashboard. Find the **VLAN** section and check if it is enabled.
 
 This allows the Tailscale container to communicate with other applications on the same Discloud account over the internal network.
 
