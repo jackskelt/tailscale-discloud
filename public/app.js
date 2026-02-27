@@ -68,6 +68,9 @@ const dom = {
 
   // Toasts
   toastContainer: $("toast-container"),
+
+  // Version
+  appVersion: $("app-version"),
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -363,6 +366,9 @@ async function loadConfig() {
     const cfg = await api("/config");
     if (cfg && cfg.hostname) {
       tailscaleHostname = cfg.hostname;
+    }
+    if (cfg && cfg.version && dom.appVersion) {
+      dom.appVersion.textContent = `v${cfg.version}`;
     }
   } catch (err) {
     console.warn("[config] Could not load config:", err);

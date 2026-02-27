@@ -61,8 +61,9 @@ type ApiResult<T> = Result<T, (StatusCode, Json<ApiErrorResponse>)>;
 
 pub async fn get_config() -> Json<ConfigResponse> {
     let hostname = get_hostname();
-    println!("[GET /api/config] hostname={hostname}");
-    Json(ConfigResponse { hostname })
+    let version = env!("CARGO_PKG_VERSION").to_string();
+    println!("[GET /api/config] hostname={hostname} version={version}");
+    Json(ConfigResponse { hostname, version })
 }
 
 // ─── GET /api/tunnels ────────────────────────────────────────────────────

@@ -133,4 +133,5 @@ pub struct TestConnectionResponse {
 #[derive(Debug, Serialize)]
 pub struct ConfigResponse {
     pub hostname: String,
+    pub version: String,
 }
