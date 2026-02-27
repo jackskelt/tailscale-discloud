@@ -2,6 +2,7 @@
   <img src="public/icon.webp" alt="Tailscale" width="120" />
   <h1>Tailscale Tunnel Manager</h1>
   <p>A self-hosted TCP tunnel manager for Tailscale containers, designed to run on <a href="https://discloud.com">Discloud</a>.</p>
+  <img src="images/banner.png" alt="Banner" />
 </div>
 
 ---
@@ -47,14 +48,13 @@ The API server listens on port `3000` and serves both the static frontend and th
 
 ### GitHub Releases
 
-Every tagged push (`v*`) triggers the release workflow. It compiles the API binary for `x86_64-unknown-linux-musl` and uploads a `release.zip` archive to GitHub Releases containing:
+Every tagged push (`v*`) triggers the release workflow. It compiles the API binary for `x86_64-unknown-linux-musl` and uploads three archives to GitHub Releases:
 
-```
-/dev/null/structure.txt#L1-3
-api          -- statically linked API server binary
-start.sh     -- entrypoint script that starts tailscaled and the API
-public/      -- static frontend files
-```
+| Archive | Contents | Use case |
+| ------- | -------- | -------- |
+| `release.zip` | `api`, `start.sh`, `public/` | Raw build artifacts without Docker or Discloud files. |
+| `deploy-remote.zip` | `Dockerfile`, `discloud.config` | Lightweight deploy package. The container downloads the binary from GitHub Releases at build time. |
+| `deploy-static.zip` | `Dockerfile` (patched for local mode), `discloud.config`, `api`, `start.sh`, `public/` | Self-contained deploy package. No network access to GitHub is needed during the Docker build. |
 
 ### Dockerfile
 
@@ -67,23 +67,20 @@ The `Dockerfile` supports two build modes controlled by the `BUILD_SOURCE` argum
 
 **Remote mode** (default):
 
-```
-/dev/null/example.sh#L1
+```bash
 docker build -t tailscale-discloud .
 ```
 
 Pin a specific version or point to a different repository:
 
-```
-/dev/null/example.sh#L1-2
+```bash
 docker build --build-arg TUNNEL_MANAGER_VERSION=v0.1.0 -t tailscale-discloud .
 docker build --build-arg GITHUB_REPO=your-user/your-fork -t tailscale-discloud .
 ```
 
 **Local mode** (requires `api`, `start.sh`, and `public/` in the build context):
 
-```
-/dev/null/example.sh#L1
+```bash
 docker build --build-arg BUILD_SOURCE=local -t tailscale-discloud .
 ```
 
@@ -91,17 +88,22 @@ The `mise run package` task automatically produces a `dist/` directory with a pa
 
 ### Deploying to Discloud
 
-For a remote build, you only need two files: the `Dockerfile` and a `discloud.config`. Upload them as a zip through the Discloud dashboard or CLI. The container will pull everything else from GitHub Releases at build time.
+The easiest way to deploy is to download one of the ready-made zip files from the [GitHub Releases](https://github.com/jackskelt/tailscale-discloud/releases) page and upload it through the Discloud dashboard or CLI:
 
-For a local build, use `mise run zip` to produce a self-contained zip that includes the compiled binary, the entrypoint, and the static files alongside the Dockerfile.
+- **`deploy-remote.zip`** -- Contains only the `Dockerfile` and `discloud.config`. The container downloads the binary from GitHub Releases at build time. This is the smallest download but requires network access to GitHub during the Docker build.
+- **`deploy-static.zip`** -- Contains the compiled binary, entrypoint, static files, `Dockerfile`, and `discloud.config`. No external downloads happen during the Docker build.
+
+For local development builds, use `mise run zip` to produce an equivalent self-contained zip from your own source tree.
 
 ```
-/dev/null/discloud.config#L1-4
 TYPE=bot
 NAME=Tailscale
+AVATAR=https://tailscale.com/favicon.png
 MAIN=Dockerfile
-RAM=256
+RAM=100
 ```
+
+Refer to [DISCLOUD.md](./DISCLOUD.md) for detailed deployment instructions.
 
 ## Development
 
@@ -114,8 +116,7 @@ Local development uses [mise](https://mise.jdx.dev) to manage the Rust toolchain
 
 Install dependencies:
 
-```
-/dev/null/example.sh#L1
+```bash
 mise install
 ```
 
@@ -131,7 +132,6 @@ mise install
 The `dist/` directory mirrors the structure expected by Discloud:
 
 ```
-/dev/null/structure.txt#L1-6
 dist/
   Dockerfile
   discloud.config

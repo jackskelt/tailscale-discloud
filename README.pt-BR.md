@@ -1,7 +1,8 @@
 <div align="center">
   <img src="public/icon.webp" alt="Tailscale" width="120" />
   <h1>Tailscale Tunnel Manager</h1>
-  <p>Um gerenciador de túneis TCP auto-hospedado para containers Tailscale, projetado para rodar na <a href="https://discloud.com">Discloud</a>.</p>
+  <p>Um gerenciador de túneis TCP para containers Tailscale, projetado para rodar na <a href="https://discloud.com">Discloud</a>.</p>
+  <img src="images/banner.png" alt="Banner" />
 </div>
 
 ---
@@ -47,13 +48,13 @@ O servidor da API escuta na porta `3000` e serve tanto o frontend estático quan
 
 ### GitHub Releases
 
-Cada push com tag (`v*`) aciona o workflow de release. Ele compila o binário da API para `x86_64-unknown-linux-musl` e envia um arquivo `release.zip` para o GitHub Releases contendo:
+Cada push com tag (`v*`) aciona o workflow de release. Ele compila o binário da API para `x86_64-unknown-linux-musl` e envia três arquivos para o GitHub Releases:
 
-```
-api          -- binário estaticamente linkado do servidor da API
-start.sh     -- script de entrada que inicia o tailscaled e a API
-public/      -- arquivos estáticos do frontend
-```
+| Arquivo | Conteúdo | Caso de uso |
+| ------- | -------- | ----------- |
+| `release.zip` | `api`, `start.sh`, `public/` | Artefatos brutos de build sem arquivos Docker ou Discloud. |
+| `deploy-remote.zip` | `Dockerfile`, `discloud.config` | Pacote de deploy leve. O container baixa o binário do GitHub Releases durante o build. |
+| `deploy-static.zip` | `Dockerfile` (modificado para modo local), `discloud.config`, `api`, `start.sh`, `public/` | Pacote de deploy completo. Nenhum acesso ao GitHub é necessário durante o build do Docker. |
 
 ### Dockerfile
 
@@ -66,20 +67,20 @@ O `Dockerfile` suporta dois modos de build controlados pelo argumento `BUILD_SOU
 
 **Modo remoto** (padrão):
 
-```
+```bash
 docker build -t tailscale-discloud .
 ```
 
 Fixar uma versão específica ou apontar para outro repositório:
 
-```
+```bash
 docker build --build-arg TUNNEL_MANAGER_VERSION=v0.1.0 -t tailscale-discloud .
 docker build --build-arg GITHUB_REPO=seu-usuario/seu-fork -t tailscale-discloud .
 ```
 
 **Modo local** (requer `api`, `start.sh` e `public/` no contexto de build):
 
-```
+```bash
 docker build --build-arg BUILD_SOURCE=local -t tailscale-discloud .
 ```
 
@@ -87,16 +88,22 @@ A task `mise run package` produz automaticamente um diretório `dist/` com um Do
 
 ### Deploy na Discloud
 
-Para um build remoto, você precisa de apenas dois arquivos: o `Dockerfile` e um `discloud.config`. Envie-os como zip pelo painel ou CLI da Discloud. O container vai baixar todo o resto do GitHub Releases durante o build.
+A forma mais fácil de fazer deploy é baixar um dos zips prontos na página de [GitHub Releases](https://github.com/jackskelt/tailscale-discloud/releases) e enviar pelo painel ou CLI da Discloud:
 
-Para um build local, use `mise run zip` para produzir um zip completo que inclui o binario compilado, o entrypoint e os arquivos estáticos junto com o Dockerfile.
+- **`deploy-remote.zip`** -- Contém apenas o `Dockerfile` e o `discloud.config`. O container baixa o binário do GitHub Releases durante o build. **(Recomendado)**
+- **`deploy-static.zip`** -- Contém o binário compilado, entrypoint, arquivos estáticos, `Dockerfile` e `discloud.config`.
+
+Para builds de desenvolvimento local, use `mise run zip` para produzir um zip completo equivalente a partir do seu próprio código-fonte.
 
 ```
 TYPE=bot
 NAME=Tailscale
+AVATAR=https://tailscale.com/favicon.png
 MAIN=Dockerfile
-RAM=256
+RAM=100
 ```
+
+Leia [DISCLOUD.md](./DISCLOUD.md) para instruções detalhadas de deploy.
 
 ## Desenvolvimento
 
@@ -109,7 +116,7 @@ O desenvolvimento local usa o [mise](https://mise.jdx.dev) para gerenciar a tool
 
 Instalar dependências:
 
-```
+```bash
 mise install
 ```
 
@@ -144,4 +151,4 @@ dist/
 Este projeto é licenciado sob a [GNU General Public License v2.0](LICENSE). Você é livre para usar, modificar e redistribuir este software, desde que todos os trabalhos derivados permaneçam open-source sob a mesma licença e deem os devidos créditos ao autor original.
 
 ## Aviso Legal
-Este projeto não e afiliado, endossado ou associado a Tailscale Inc. ou a marca Tailscale de nenhuma forma. "Tailscale" é uma marca registrada da Tailscale Inc.
+Este projeto não é afiliado, endossado ou associado a Tailscale Inc. ou a marca Tailscale de nenhuma forma. "Tailscale" é uma marca registrada da Tailscale Inc.

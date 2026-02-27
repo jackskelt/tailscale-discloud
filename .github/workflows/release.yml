@@ -48,10 +48,33 @@ jobs:
           chmod +x staging/api staging/start.sh
           cd staging && zip -r ../release.zip api start.sh public/
 
+      - name: Prepare deploy-remote.zip
+        run: |
+          mkdir -p deploy-remote
+          cp Dockerfile deploy-remote/Dockerfile
+          cp discloud.config deploy-remote/discloud.config
+          cd deploy-remote && zip -r ../deploy-remote.zip Dockerfile discloud.config
+
+      - name: Prepare deploy-static.zip
+        run: |
+          mkdir -p deploy-static
+          cp target/x86_64-unknown-linux-musl/release/api deploy-static/api
+          cp start.sh deploy-static/start.sh
+          cp -r public/ deploy-static/
+          cp Dockerfile deploy-static/Dockerfile
+          cp discloud.config deploy-static/discloud.config
+          chmod +x deploy-static/api deploy-static/start.sh
+          sed -i 's|ARG BUILD_SOURCE=remote|ARG BUILD_SOURCE=local|' deploy-static/Dockerfile
+          sed -i 's|# APP_FILES|COPY api /home/tailscale/api\nCOPY start.sh /home/tailscale/start.sh\nCOPY public/ /home/tailscale/public/|' deploy-static/Dockerfile
+          cd deploy-static && zip -r ../deploy-static.zip Dockerfile discloud.config api start.sh public/
+
       - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          files: release.zip
+          files: |
+            release.zip
+            deploy-remote.zip
+            deploy-static.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
