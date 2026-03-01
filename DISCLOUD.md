@@ -1,18 +1,18 @@
 <div align="center">
-  <img src="public/icon.webp" alt="Tailscale" width="120" />
+  <img src="https://github.com/jackskelt/tailscale-discloud/blob/main/public/icon.webp?raw=true" alt="Tailscale" width="120" />
   <h1>Tailscale Tunnel Manager</h1>
   <p>A self-hosted TCP tunnel manager for Tailscale containers, designed to run on <a href="https://discloud.com">Discloud</a>.</p>
   <p><a href="https://github.com/jackskelt/tailscale-discloud">View on GitHub</a></p>
-  <p><a href="DISCLOUD.pt-BR.md">🇧🇷 Versão em Português</a></p>
+  <p><a href="https://github.com/jackskelt/tailscale-discloud/blob/main/DISCLOUD.pt-BR.md">🇧🇷 Versão em Português</a></p>
 </div>
 
 <table>
   <tr>
     <td width="50%">
-      <img src="images/banner.png" alt="Banner — Tailscale Tunnel Manager web dashboard" width="100%" />
+      <img src="https://github.com/jackskelt/tailscale-discloud/blob/main/images/banner.png?raw=true" alt="Banner — Tailscale Tunnel Manager web dashboard" width="100%" />
     </td>
     <td width="50%">
-      <img src="images/deploy/tailscale-diagram.png" alt="Architecture — How your computer connects to Discloud services through the Tailscale network" width="100%" />
+      <img src="https://github.com/jackskelt/tailscale-discloud/blob/main/images/deploy/tailscale-diagram.png?raw=true" alt="Architecture — How your computer connects to Discloud services through the Tailscale network" width="100%" />
     </td>
   </tr>
 </table>
@@ -49,7 +49,7 @@ The primary use case is running the manager on a Discloud container so that serv
    3. [Authorize the node](#23-authorize-the-node)
    4. [Verify the machine on Tailscale](#24-verify-the-machine-on-tailscale)
    5. [Access the web dashboard](#25-access-the-web-dashboard)
-3. [Usage — Creating your first tunnel](#3-usage--creating-your-first-tunnel)
+3. [Usage — Creating your first tunnel](#3-usage---creating-your-first-tunnel)
    1. [Deploy a MySQL instance from a template](#31-deploy-a-mysql-instance-from-a-template)
    2. [Configure VLAN on the MySQL application](#32-configure-vlan-on-the-mysql-application)
    3. [Open the Tunnel Manager dashboard](#33-open-the-tunnel-manager-dashboard)
@@ -66,7 +66,7 @@ The primary use case is running the manager on a Discloud container so that serv
 
 Go to [https://tailscale.com](https://tailscale.com) and create a free account. You can sign up with Google, Microsoft, GitHub, or other identity providers.
 
-![Tailscale sign-up page showing the available identity providers](images/deploy/tailscale-signup.png)
+![Tailscale sign-up page showing the available identity providers](https://github.com/jackskelt/tailscale-discloud/blob/main/images/deploy/tailscale-signup.png?raw=true)
 
 #### 1.2 Install the Tailscale client
 
@@ -76,7 +76,7 @@ Tailscale supports Windows, macOS, Linux, iOS, and Android. Follow the official 
 
 📖 **[Tailscale Downloads & Install Guide](https://tailscale.com/download)**
 
-![Tailscale download page showing clients for different platforms](images/deploy/tailscale-download.png)
+![Tailscale download page showing clients for different platforms](https://github.com/jackskelt/tailscale-discloud/blob/main/images/deploy/tailscale-download.png?raw=true)
 
 #### 1.3 Connect and verify
 
@@ -84,7 +84,7 @@ After installing, open the Tailscale client and log in with the same account you
 
 Once connected, your machine should appear in the Tailscale admin console at [https://login.tailscale.com/admin/machines](https://login.tailscale.com/admin/machines).
 
-![Tailscale admin console showing the local machine listed under Machines](images/deploy/tailscale-machines-local.png)
+![Tailscale admin console showing the local machine listed under Machines](https://github.com/jackskelt/tailscale-discloud/blob/main/images/deploy/tailscale-machines-local.png?raw=true)
 
 ---
 
@@ -105,7 +105,7 @@ There are two ways to deploy Tailscale Tunnel Manager on Discloud. Choose the on
 
 Go to the [Tailscale template page](https://discloud.com/templates/tailscale-discloud) on Discloud and click **Host Now**. Configure the options to your liking and deploy it.
 
-![Discloud Tailscale template page](images/deploy/discloud-template.png)
+![Discloud Tailscale template page](https://github.com/jackskelt/tailscale-discloud/blob/main/images/deploy/discloud-template.png?raw=true)
 
 > **⚠️ Important:** The default template hostname is `tailscale-discloud`. If you change the hostname during setup, remember to use the new hostname instead of `tailscale-discloud` when accessing the web dashboard and configuring tunnels later. To avoid confusion, it is recommended to keep the hostname as `tailscale-discloud`.
 
@@ -135,13 +135,13 @@ Both zips follow the exact same deployment steps below. The only difference is h
 
 Log in to the Discloud dashboard at [https://discloud.com/dashboard](https://discloud.com/dashboard).
 
-![Discloud dashboard main page](images/deploy/discloud-dashboard.png)
+![Discloud dashboard main page](https://github.com/jackskelt/tailscale-discloud/blob/main/images/deploy/discloud-dashboard.png?raw=true)
 
 **B.3 Upload the zip**
 
 Click **Add App** (or the upload button) on the Discloud dashboard and upload the zip file you downloaded in step B.1.
 
-![Discloud dashboard upload page](images/deploy/discloud-upload.png)
+![Discloud dashboard upload page](https://github.com/jackskelt/tailscale-discloud/blob/main/images/deploy/discloud-upload.png?raw=true)
 
 **B.4 Verify if VLAN is enabled on Discloud**
 
@@ -149,7 +149,7 @@ Go to the **Settings** of the Tailscale Tunnel Manager application on the Disclo
 
 This allows the Tailscale container to communicate with other applications on the same Discloud account over the internal network.
 
-![Discloud application settings page with the VLAN toggle enabled](images/deploy/discloud-vlan-enable.png)
+![Discloud application settings page with the VLAN toggle enabled](https://github.com/jackskelt/tailscale-discloud/blob/main/images/deploy/discloud-vlan-enable.png?raw=true)
 
 After completing these steps, proceed to [step 2.2](#22-find-the-tailscale-login-link).
 
@@ -165,19 +165,19 @@ After the application starts, go to the **Logs** section of your application and
 To authenticate, visit: https://login.tailscale.com/a/XXXXXXXXXX
 ```
 
-![Discloud logs panel with auto-reload enabled showing the Tailscale authentication URL](images/deploy/discloud-logs-tailscale-url.png)
+![Discloud logs panel with auto-reload enabled showing the Tailscale authentication URL](https://github.com/jackskelt/tailscale-discloud/blob/main/images/deploy/discloud-logs-tailscale-url.png?raw=true)
 
 #### 2.3 Authorize the node
 
 Open the Tailscale login URL from the logs in your browser. Log in with the same Tailscale account you created earlier and **approve the connection**.
 
-![Tailscale authorization page asking to approve the new node](images/deploy/tailscale-authorize-node.png)
+![Tailscale authorization page asking to approve the new node](https://github.com/jackskelt/tailscale-discloud/blob/main/images/deploy/tailscale-authorize-node.png?raw=true)
 
 #### 2.4 Verify the machine on Tailscale
 
 Go back to the Tailscale admin console at [https://login.tailscale.com/admin/machines](https://login.tailscale.com/admin/machines) and verify that a new machine called **`tailscale-discloud`** appears in the list.
 
-![Tailscale admin console showing the tailscale-discloud machine in the Machines list](images/deploy/tailscale-machines-discloud.png)
+![Tailscale admin console showing the tailscale-discloud machine in the Machines list](https://github.com/jackskelt/tailscale-discloud/blob/main/images/deploy/tailscale-machines-discloud.png?raw=true)
 
 #### 2.5 Access the web dashboard
 
@@ -189,11 +189,11 @@ http://tailscale-discloud:3000
 
 You should see the Tailscale Tunnel Manager web dashboard.
 
-![Tailscale Tunnel Manager web dashboard loaded in a browser at http://tailscale-discloud:3000](images/banner.png)
+![Tailscale Tunnel Manager web dashboard loaded in a browser at http://tailscale-discloud:3000](https://github.com/jackskelt/tailscale-discloud/blob/main/images/banner.png?raw=true)
 
 ---
 
-### 3. Usage — Creating your first tunnel
+### 3. Usage - Creating your first tunnel
 
 This example walks through setting up a tunnel to a MySQL instance hosted on Discloud using the official MySQL template.
 
@@ -201,7 +201,7 @@ This example walks through setting up a tunnel to a MySQL instance hosted on Dis
 
 Go to the Discloud MySQL template page at [https://discloud.com/templates/1753305454851mysql](https://discloud.com/templates/1753305454851mysql), configure the settings to your liking, and deploy it.
 
-![Discloud MySQL template page with configuration options](images/deploy/discloud-mysql-template.png)
+![Discloud MySQL template page with configuration options](https://github.com/jackskelt/tailscale-discloud/blob/main/images/deploy/discloud-mysql-template.png?raw=true)
 
 #### 3.2 Configure VLAN on the MySQL application
 
@@ -209,7 +209,7 @@ After the MySQL template is deployed, go to its **Settings** on the Discloud das
 
 For the MySQL template, the VLAN is already enabled and the default hostname is **`mysql`**.
 
-![Discloud MySQL application settings showing VLAN enabled with hostname set to mysql](images/deploy/discloud-mysql-vlan.png)
+![Discloud MySQL application settings showing VLAN enabled with hostname set to mysql](https://github.com/jackskelt/tailscale-discloud/blob/main/images/deploy/discloud-mysql-vlan.png?raw=true)
 
 > **⚠️ Important:** For a regular (non-template) application, you need to manually enable VLAN and set a unique hostname. **Do not use duplicate hostnames** across your applications — each application must have a distinct VLAN hostname, otherwise the internal routing will not work correctly.
 
@@ -234,7 +234,7 @@ Here is what each parameter means:
 | **Target Host** | The VLAN hostname of the application you want to reach. Must match the hostname configured in the VLAN settings of the target app. | `mysql` |
 | **Target Port** | The port the target application is listening on. | `3306` |
 
-![Tunnel Manager new tunnel form with MySQL template selected showing the parameter fields](images/deploy/tunnel-manager-new-tunnel.png)
+![Tunnel Manager new tunnel form with MySQL template selected showing the parameter fields](https://github.com/jackskelt/tailscale-discloud/blob/main/images/deploy/tunnel-manager-new-tunnel.png?raw=true)
 
 > **💡 Tip:** You can change the **Local Port** to any available port if the default one is already in use on the tailscale instance. The **Target Host** and **Target Port** must match the VLAN hostname and listening port of the destination application.
 
@@ -242,7 +242,7 @@ Here is what each parameter means:
 
 After creating the tunnel, check the **Active Tunnels** section on the dashboard. Your MySQL tunnel should appear with an **Online** status.
 
-![Tunnel Manager dashboard showing the MySQL tunnel in the Active Tunnels list with Online status](images/deploy/tunnel-manager-active-tunnels.png)
+![Tunnel Manager dashboard showing the MySQL tunnel in the Active Tunnels list with Online status](https://github.com/jackskelt/tailscale-discloud/blob/main/images/deploy/tunnel-manager-active-tunnels.png?raw=true)
 
 #### 3.6 Get the connection string
 
@@ -269,6 +269,6 @@ Open your preferred database client (this example uses **Tabularis**) and create
 - **Port:** `3306`
 - **User / Password:** The credentials you configured when deploying the MySQL template.
 
-![Tabularis database client connected to the MySQL instance through the Tailscale tunnel](images/deploy/tabularis-mysql-connection.png)
+![Tabularis database client connected to the MySQL instance through the Tailscale tunnel](https://github.com/jackskelt/tailscale-discloud/blob/main/images/deploy/tabularis-mysql-connection.png?raw=true)
 
 That's it! Your MySQL instance running on Discloud is now securely accessible from your local machine through the Tailscale network.
