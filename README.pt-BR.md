@@ -88,9 +88,11 @@ A task `mise run package` produz automaticamente um diretório `dist/` com um Do
 
 ### Deploy na Discloud
 
-A forma mais fácil de fazer deploy é baixar um dos zips prontos na página de [GitHub Releases](https://github.com/jackskelt/tailscale-discloud/releases) e enviar pelo painel ou CLI da Discloud:
+A forma mais fácil de fazer deploy é usar o **template oficial da Discloud**. Acesse a [página do template Tailscale](https://discloud.com/templates/tailscale-discloud), clique em **Hospedar Agora**, configure as opções e faça o deploy em poucos cliques.
 
-- **`deploy-remote.zip`** -- Contém apenas o `Dockerfile` e o `discloud.config`. O container baixa o binário do GitHub Releases durante o build. **(Recomendado)**
+Alternativamente, você pode baixar um dos zips prontos na página de [GitHub Releases](https://github.com/jackskelt/tailscale-discloud/releases) e enviar manualmente pelo painel ou CLI da Discloud:
+
+- **`deploy-remote.zip`** -- Contém apenas o `Dockerfile` e o `discloud.config`. O container baixa o binário do GitHub Releases durante o build.
 - **`deploy-static.zip`** -- Contém o binário compilado, entrypoint, arquivos estáticos, `Dockerfile` e `discloud.config`.
 
 Para builds de desenvolvimento local, use `mise run zip` para produzir um zip completo equivalente a partir do seu próprio código-fonte.
@@ -104,7 +106,7 @@ RAM=100
 VLAN=true
 ```
 
-Leia [DISCLOUD.md](./DISCLOUD.md) para instruções detalhadas de deploy.
+Leia [DISCLOUD.pt-BR.md](./DISCLOUD.pt-BR.md) para instruções detalhadas de deploy.
 
 ## Desenvolvimento
 

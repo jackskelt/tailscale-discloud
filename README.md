@@ -88,7 +88,9 @@ The `mise run package` task automatically produces a `dist/` directory with a pa
 
 ### Deploying to Discloud
 
-The easiest way to deploy is to download one of the ready-made zip files from the [GitHub Releases](https://github.com/jackskelt/tailscale-discloud/releases) page and upload it through the Discloud dashboard or CLI:
+The easiest way to deploy is to use the official **[Discloud template](https://discloud.com/templates/tailscale-discloud)**. Just click **Host Now**, configure the options to your liking, and deploy — no file downloads required.
+
+Alternatively, you can download one of the ready-made zip files from the [GitHub Releases](https://github.com/jackskelt/tailscale-discloud/releases) page and upload it through the Discloud dashboard or CLI:
 
 - **`deploy-remote.zip`** -- Contains only the `Dockerfile` and `discloud.config`. The container downloads the binary from GitHub Releases at build time. This is the smallest download but requires network access to GitHub during the Docker build.
 - **`deploy-static.zip`** -- Contains the compiled binary, entrypoint, static files, `Dockerfile`, and `discloud.config`. No external downloads happen during the Docker build.

@@ -2,6 +2,8 @@
   <img src="public/icon.webp" alt="Tailscale" width="120" />
   <h1>Tailscale Tunnel Manager</h1>
   <p>A self-hosted TCP tunnel manager for Tailscale containers, designed to run on <a href="https://discloud.com">Discloud</a>.</p>
+  <p><a href="https://github.com/jackskelt/tailscale-discloud">View on GitHub</a></p>
+  <p><a href="DISCLOUD.pt-BR.md">🇧🇷 Versão em Português</a></p>
 </div>
 
 <table>
@@ -40,14 +42,13 @@ The primary use case is running the manager on a Discloud container so that serv
    2. [Install the Tailscale client](#12-install-the-tailscale-client)
    3. [Connect and verify](#13-connect-and-verify)
 2. [Deploying to Discloud](#2-deploying-to-discloud)
-   1. [Download the deploy zip](#21-download-the-deploy-zip)
-   2. [Access the Discloud dashboard](#22-access-the-discloud-dashboard)
-   3. [Upload the zip](#23-upload-the-zip)
-   4. [Find the Tailscale login link](#24-find-the-tailscale-login-link)
-   5. [Authorize the node](#25-authorize-the-node)
-   6. [Verify the machine on Tailscale](#26-verify-the-machine-on-tailscale)
-   7. [Verify if VLAN is enabledon Discloud](#27-verify-if-vlan-is-enabled-on-discloud)
-   8. [Access the web dashboard](#28-access-the-web-dashboard)
+   1. [Hosting on Discloud](#21-hosting-on-discloud)
+      - [Option A: Using the Discloud template (Recommended)](#option-a-using-the-discloud-template-recommended)
+      - [Option B: Using the repository zip](#option-b-using-the-repository-zip)
+   2. [Find the Tailscale login link](#22-find-the-tailscale-login-link)
+   3. [Authorize the node](#23-authorize-the-node)
+   4. [Verify the machine on Tailscale](#24-verify-the-machine-on-tailscale)
+   5. [Access the web dashboard](#25-access-the-web-dashboard)
 3. [Usage — Creating your first tunnel](#3-usage--creating-your-first-tunnel)
    1. [Deploy a MySQL instance from a template](#31-deploy-a-mysql-instance-from-a-template)
    2. [Configure VLAN on the MySQL application](#32-configure-vlan-on-the-mysql-application)
@@ -89,7 +90,37 @@ Once connected, your machine should appear in the Tailscale admin console at [ht
 
 ### 2. Deploying to Discloud
 
-#### 2.1 Download the deploy zip
+> **⚠️ Important:** You need a **Diamond** plan or higher to use VLAN on Discloud.
+
+#### 2.1 Hosting on Discloud
+
+There are two ways to deploy Tailscale Tunnel Manager on Discloud. Choose the one that best suits your needs:
+
+- **[Option A: Using the Discloud template](#option-a-using-the-discloud-template-recommended)** — The quickest and easiest way. Deploy directly from the Discloud template with a few clicks.
+- **[Option B: Using the repository zip](#option-b-using-the-repository-zip)** — Download a zip from GitHub Releases and upload it manually to Discloud.
+
+---
+
+##### Option A: Using the Discloud template (Recommended)
+
+Go to the [Tailscale template page](https://discloud.com/templates/tailscale-discloud) on Discloud and click **Host Now**. Configure the options to your liking and deploy it.
+
+![Discloud Tailscale template page](images/deploy/discloud-template.png)
+
+> **⚠️ Important:** The default template hostname is `tailscale-discloud`. If you change the hostname during setup, remember to use the new hostname instead of `tailscale-discloud` when accessing the web dashboard and configuring tunnels later. To avoid confusion, it is recommended to keep the hostname as `tailscale-discloud`.
+
+After deploying, proceed to [step 2.2](#22-find-the-tailscale-login-link).
+
+---
+
+##### Option B: Using the repository zip
+
+<details>
+<summary><strong>Click to expand the zip deploy instructions</strong></summary>
+
+<br>
+
+**B.1 Download the deploy zip**
 
 Go to the [GitHub Releases](https://github.com/jackskelt/tailscale-discloud/releases) page and download one of the deploy zips:
 
@@ -100,21 +131,33 @@ Both zips follow the exact same deployment steps below. The only difference is h
 
 > **💡 Tip about updates:** If you use `deploy-remote.zip`, your container will always pull the **latest** release from GitHub when it is rebuilt. With `deploy-static.zip`, the binary is baked into the zip, so you need to download a new zip from Releases and re-upload it to update.
 
-#### 2.2 Access the Discloud dashboard
+**B.2 Access the Discloud dashboard**
 
 Log in to the Discloud dashboard at [https://discloud.com/dashboard](https://discloud.com/dashboard).
 
 ![Discloud dashboard main page](images/deploy/discloud-dashboard.png)
 
-> **⚠️ Important:** You need a **Diamond** plan or higher to use VLAN on Discloud.
+**B.3 Upload the zip**
 
-#### 2.3 Upload the zip
-
-Click **Add App** (or the upload button) on the Discloud dashboard and upload the zip file you downloaded in step 2.1.
+Click **Add App** (or the upload button) on the Discloud dashboard and upload the zip file you downloaded in step B.1.
 
 ![Discloud dashboard upload page](images/deploy/discloud-upload.png)
 
-#### 2.4 Find the Tailscale login link
+**B.4 Verify if VLAN is enabled on Discloud**
+
+Go to the **Settings** of the Tailscale Tunnel Manager application on the Discloud dashboard. Find the **VLAN** section and check if it is enabled.
+
+This allows the Tailscale container to communicate with other applications on the same Discloud account over the internal network.
+
+![Discloud application settings page with the VLAN toggle enabled](images/deploy/discloud-vlan-enable.png)
+
+After completing these steps, proceed to [step 2.2](#22-find-the-tailscale-login-link).
+
+</details>
+
+---
+
+#### 2.2 Find the Tailscale login link
 
 After the application starts, go to the **Logs** section of your application and enable **Auto-Reload**. Wait for the logs to show a Tailscale login URL. It will look something like:
 
@@ -124,27 +167,19 @@ To authenticate, visit: https://login.tailscale.com/a/XXXXXXXXXX
 
 ![Discloud logs panel with auto-reload enabled showing the Tailscale authentication URL](images/deploy/discloud-logs-tailscale-url.png)
 
-#### 2.5 Authorize the node
+#### 2.3 Authorize the node
 
 Open the Tailscale login URL from the logs in your browser. Log in with the same Tailscale account you created earlier and **approve the connection**.
 
 ![Tailscale authorization page asking to approve the new node](images/deploy/tailscale-authorize-node.png)
 
-#### 2.6 Verify the machine on Tailscale
+#### 2.4 Verify the machine on Tailscale
 
 Go back to the Tailscale admin console at [https://login.tailscale.com/admin/machines](https://login.tailscale.com/admin/machines) and verify that a new machine called **`tailscale-discloud`** appears in the list.
 
 ![Tailscale admin console showing the tailscale-discloud machine in the Machines list](images/deploy/tailscale-machines-discloud.png)
 
-#### 2.7 Verify if VLAN is enabled on Discloud
-
-Go to the **Settings** of the Tailscale Tunnel Manager application on the Discloud dashboard. Find the **VLAN** section and check if it is enabled.
-
-This allows the Tailscale container to communicate with other applications on the same Discloud account over the internal network.
-
-![Discloud application settings page with the VLAN toggle enabled](images/deploy/discloud-vlan-enable.png)
-
-#### 2.8 Access the web dashboard
+#### 2.5 Access the web dashboard
 
 On your local machine (which is connected to Tailscale), open a browser and navigate to:
 
