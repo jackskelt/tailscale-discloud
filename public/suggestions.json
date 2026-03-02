@@ -1,7 +1,7 @@
 [
   {
     "name": "PostgreSQL",
-    "target_host": "postgres",
+    "target_host": "postgresql",
     "target_port": 5432,
     "description": "PostgreSQL database server"
   },
@@ -22,5 +22,11 @@
     "target_host": "mongodb",
     "target_port": 27017,
     "description": "MongoDB NoSQL database"
+  },
+  {
+    "name": "Valkey",
+    "target_host": "valkey",
+    "target_port": 6379,
+    "description": "Valkey in-memory data store"
   }
 ]
