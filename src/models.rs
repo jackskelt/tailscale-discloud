@@ -132,6 +132,13 @@ pub struct TestConnectionResponse {
 /// Response for GET /api/config
 #[derive(Debug, Serialize)]
 pub struct ConfigResponse {
-    pub hostname: String,
+    /// MagicDNS short hostname (without suffix).
+    pub magicdns_hostname: String,
+    /// MagicDNS fully-qualified DNS name.
+    pub dns_name: String,
+    /// Primary IPv4 address for the node (if any).
+    pub ipv4: String,
+    /// Primary IPv6 address for the node (if any).
+    pub ipv6: String,
     pub version: String,
 }

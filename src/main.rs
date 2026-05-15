@@ -11,7 +11,12 @@ use tower_http::services::ServeDir;
 use crate::routes::{
     create_tunnel, delete_tunnel, get_config, list_tunnels, test_endpoint, update_tunnel,
 };
-use crate::state::{load_tunnels, restore_tunnels, SharedState};
+use crate::state::{get_local_node_info, load_tunnels, restore_tunnels, SharedState};
+
+fn clickable_terminal_link(url: &str) -> String {
+    // For terminals that support OSC 8 hyperlinks (most Unix terminals), format the URL as a clickable link.
+    format!("\x1b]8;;{url}\x1b\\{url}\x1b]8;;\x1b\\")
+}
 
 #[tokio::main]
 async fn main() {
@@ -40,6 +45,29 @@ async fn main() {
 
     let bind_addr = "0.0.0.0:3000";
     println!("[main] Listening on {bind_addr}");
+
+    match get_local_node_info().await {
+        Ok(config) => {
+            println!("[main] You can connect to this node using:");
+            println!(
+                "  - Hostname: {}",
+                clickable_terminal_link(&format!("http://{}:3000/", config.dns_name))
+            );
+            println!(
+                "  - MagicDNS: {}",
+                clickable_terminal_link(&format!("http://{}:3000/", config.magicdns_hostname))
+            );
+            println!(
+                "  - IPv4: {}",
+                clickable_terminal_link(&format!("http://{}:3000/", config.ipv4))
+            );
+            println!(
+                "  - IPv6: {}",
+                clickable_terminal_link(&format!("http://[{}]:3000/", config.ipv6))
+            );
+        }
+        Err(e) => eprintln!("[main] Failed to read LocalAPI node info: {e}"),
+    }
 
     let listener = tokio::net::TcpListener::bind(bind_addr)
         .await

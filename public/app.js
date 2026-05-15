@@ -6,7 +6,12 @@ let suggestions = [];
 let i18nStrings = {};
 let i18nLanguages = [];
 let currentLang = "en";
-let tailscaleHostname = "tailscale-discloud";
+let tailscaleMagicHostname = "";
+let tailscaleDnsName = "";
+let tailscaleIpv4 = "";
+let tailscaleIpv6 = "";
+let selectedConnectionDisplay = "magicdns";
+const NODE_DISPLAY_STORAGE_KEY = "nodeDisplay";
 
 // ─── DOM Cache ───────────────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
@@ -71,6 +76,22 @@ const dom = {
 
   // Version
   appVersion: $("app-version"),
+
+  // Node info
+  nodeInfoBtn: $("node-info-btn"),
+  nodeDisplayHost: $("node-display-host"),
+  nodeDisplayValue: $("node-display-value"),
+  nodeInfoOverlay: $("node-info-overlay"),
+  nodeInfoClose: $("node-info-close"),
+  nodeInfoDone: $("node-info-done"),
+  nodeInfoGrid: $("node-info-grid"),
+
+  // Connection modal
+  connectionOverlay: $("connection-overlay"),
+  connectionClose: $("connection-close"),
+  connectionDone: $("connection-done"),
+  connectionTitle: $("connection-title"),
+  connectionGrid: $("connection-grid"),
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -80,8 +101,12 @@ const dom = {
 document.addEventListener("DOMContentLoaded", async () => {
   initTheme();
   await initI18n();
+  initNodeDisplayPreference();
   bindEvents();
+  bindNodeInfoEvents();
+  bindConnectionEvents();
   loadConfig();
+
   loadSuggestions();
   loadTunnels();
 });
@@ -284,7 +309,11 @@ function bindEvents() {
   dom.tunnelForm.addEventListener("submit", onCreateSubmit);
   dom.formCancelBtn.addEventListener("click", resetCreateForm);
 
-  dom.refreshBtn.addEventListener("click", loadTunnels);
+  dom.refreshBtn.addEventListener("click", () => {
+    loadConfig();
+    loadTunnels();
+  });
+
   dom.themeToggle.addEventListener("click", toggleTheme);
 
   dom.langBtn.addEventListener("click", (e) => {
@@ -323,6 +352,8 @@ function bindEvents() {
     if (e.key === "Escape") {
       closeOverlay(dom.testOverlay);
       closeOverlay(dom.editOverlay);
+      closeOverlay(dom.nodeInfoOverlay);
+      closeOverlay(dom.connectionOverlay);
       closeLangDropdown();
     }
   });
@@ -364,9 +395,13 @@ async function api(path, opts = {}) {
 async function loadConfig() {
   try {
     const cfg = await api("/config");
-    if (cfg && cfg.hostname) {
-      tailscaleHostname = cfg.hostname;
+    if (cfg) {
+      tailscaleMagicHostname = cfg.magicdns_hostname || "";
+      tailscaleDnsName = cfg.dns_name || "";
+      tailscaleIpv4 = cfg.ipv4 || "";
+      tailscaleIpv6 = cfg.ipv6 || "";
     }
+    updateNodeInfo();
     if (cfg && cfg.version && dom.appVersion) {
       dom.appVersion.textContent = `v${cfg.version}`;
     }
@@ -740,14 +775,207 @@ function extractTunnel(response) {
   return response;
 }
 
+const nodeDisplayOptions = [
+  {
+    key: "magicdns",
+    label: "MagicDNS",
+    getValue: () => tailscaleMagicHostname,
+  },
+  { key: "dnsname", label: "DNSName", getValue: () => tailscaleDnsName },
+  { key: "ipv4", label: "IPv4", getValue: () => tailscaleIpv4 },
+  { key: "ipv6", label: "IPv6", getValue: () => tailscaleIpv6 },
+];
+
+function initNodeDisplayPreference() {
+  const stored = localStorage.getItem(NODE_DISPLAY_STORAGE_KEY);
+  if (!stored) return;
+  const valid = nodeDisplayOptions.some((item) => item.key === stored);
+  if (valid) {
+    selectedConnectionDisplay = stored;
+  }
+}
+
+function persistNodeDisplayPreference() {
+  localStorage.setItem(NODE_DISPLAY_STORAGE_KEY, selectedConnectionDisplay);
+}
+
+function getPreferredNodeHost() {
+  const option = nodeDisplayOptions.find(
+    (item) => item.key === selectedConnectionDisplay,
+  );
+  const value = option ? option.getValue() : "";
+  return (
+    value ||
+    tailscaleMagicHostname ||
+    tailscaleDnsName ||
+    tailscaleIpv4 ||
+    tailscaleIpv6 ||
+    ""
+  );
+}
+
+function resolveFirstAvailableDisplay() {
+  const available = nodeDisplayOptions.find((item) => item.getValue());
+  return available ? available.key : "magicdns";
+}
+
+function updateNodeInfo() {
+  const current = nodeDisplayOptions.find(
+    (item) => item.key === selectedConnectionDisplay,
+  );
+  const value = current ? current.getValue() : "";
+  if (!value) {
+    selectedConnectionDisplay = resolveFirstAvailableDisplay();
+  }
+
+  const active = nodeDisplayOptions.find(
+    (item) => item.key === selectedConnectionDisplay,
+  );
+  const label = active ? active.label : "";
+  const displayValue = active ? active.getValue() : "";
+
+  if (dom.nodeDisplayHost) {
+    dom.nodeDisplayHost.textContent = label;
+  }
+  if (dom.nodeDisplayValue) {
+    dom.nodeDisplayValue.textContent = displayValue || "—";
+  }
+  persistNodeDisplayPreference();
+  renderNodeInfoModal();
+  if (tunnels.length > 0) {
+    renderTunnels();
+  }
+}
+
+function renderNodeInfoModal() {
+  if (!dom.nodeInfoGrid) return;
+  dom.nodeInfoGrid.innerHTML = nodeDisplayOptions
+    .map((item) => {
+      const value = item.getValue() || "";
+      const selected = item.key === selectedConnectionDisplay;
+      const disabled = !value;
+      return `
+        <button class="node-info-row${selected ? " active" : ""}${disabled ? " disabled" : ""}" data-node-key="${escAttr(item.key)}" ${disabled ? "disabled" : ""}>
+          <span class="node-info-label">${esc(item.label)}</span>
+          <span class="node-info-value">${esc(value || "—")}</span>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function bindNodeInfoEvents() {
+  if (dom.nodeInfoBtn) {
+    dom.nodeInfoBtn.addEventListener("click", () =>
+      openOverlay(dom.nodeInfoOverlay),
+    );
+  }
+  if (dom.nodeInfoClose) {
+    dom.nodeInfoClose.addEventListener("click", () =>
+      closeOverlay(dom.nodeInfoOverlay),
+    );
+  }
+  if (dom.nodeInfoDone) {
+    dom.nodeInfoDone.addEventListener("click", () =>
+      closeOverlay(dom.nodeInfoOverlay),
+    );
+  }
+  if (dom.nodeInfoOverlay) {
+    dom.nodeInfoOverlay.addEventListener("click", (e) => {
+      if (e.target === dom.nodeInfoOverlay) {
+        closeOverlay(dom.nodeInfoOverlay);
+      }
+    });
+  }
+  if (dom.nodeInfoGrid) {
+    dom.nodeInfoGrid.addEventListener("click", (e) => {
+      const btn = e.target.closest(".node-info-row");
+      if (!btn) return;
+      const key = btn.getAttribute("data-node-key");
+      if (!key) return;
+      selectedConnectionDisplay = key;
+      updateNodeInfo();
+    });
+  }
+}
+
+function bindConnectionEvents() {
+  if (dom.connectionClose) {
+    dom.connectionClose.addEventListener("click", () =>
+      closeOverlay(dom.connectionOverlay),
+    );
+  }
+  if (dom.connectionDone) {
+    dom.connectionDone.addEventListener("click", () =>
+      closeOverlay(dom.connectionOverlay),
+    );
+  }
+  if (dom.connectionOverlay) {
+    dom.connectionOverlay.addEventListener("click", (e) => {
+      if (e.target === dom.connectionOverlay) {
+        closeOverlay(dom.connectionOverlay);
+      }
+    });
+  }
+  if (dom.connectionGrid) {
+    dom.connectionGrid.addEventListener("click", (e) => {
+      const btn = e.target.closest(".copy-row");
+      if (!btn) return;
+      const value = btn.getAttribute("data-copy-value");
+      if (!value) return;
+      copyToClipboard(value);
+    });
+  }
+}
+
+function openConnectionModal(tunnelId) {
+  const tunnel = tunnels.find((t) => t.id === tunnelId);
+  if (!tunnel) return;
+
+  const options = nodeDisplayOptions
+    .map((item) => {
+      const host = item.getValue();
+      if (!host) return null;
+      return {
+        label: item.label,
+        value: `${host}:${tunnel.local_port}`,
+      };
+    })
+    .filter(Boolean);
+
+  if (dom.connectionTitle) {
+    dom.connectionTitle.textContent = tunnel.name || "Connection";
+  }
+
+  if (dom.connectionGrid) {
+    dom.connectionGrid.innerHTML = options.length
+      ? options
+          .map(
+            (item) => `
+        <button class="copy-row" data-copy-value="${escAttr(item.value)}" type="button">
+          <span class="copy-row-label">${esc(item.label)}</span>
+          <span class="copy-row-value">${esc(item.value)}</span>
+        </button>
+      `,
+          )
+          .join("")
+      : `<div class="text-muted">No addresses available</div>`;
+  }
+
+  openOverlay(dom.connectionOverlay);
+}
+
 /**
  * Compute a connection URL client-side for list items that might not
  * have it (fallback).
  */
 function getConnectionUrl(tun) {
-  if (tun.connection_url) return tun.connection_url;
-  if (tun.enabled) return `${tailscaleHostname}:${tun.local_port}`;
-  return null;
+  if (!tun.enabled) return null;
+
+  const host = getPreferredNodeHost();
+  if (host) return `${host}:${tun.local_port}`;
+
+  return tun.connection_url || null;
 }
 
 /**
@@ -815,7 +1043,10 @@ function renderTunnels() {
       const connUrl = getConnectionUrl(tun);
       const connUrlHtml = connUrl
         ? `<div class="connection-url-cell">
-            <code class="connection-url-text">${esc(connUrl)}</code>
+            <button class="connection-url-text connection-url-trigger" type="button" onclick="openConnectionModal('${tun.id}')">
+              ${esc(connUrl)}
+            </button>
+
             <button class="btn-copy" onclick="event.stopPropagation(); copyToClipboard('${escAttr(connUrl)}', this)" title="${escAttr(t("actions.copy"))}">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             </button>

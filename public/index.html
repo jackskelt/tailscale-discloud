@@ -35,6 +35,22 @@
                                 class="header-version"
                             ></span>
                         </div>
+                        <div class="header-node-info">
+                            <button
+                                class="btn btn-ghost btn-sm node-info-btn"
+                                id="node-info-btn"
+                                title="View node addresses"
+                            >
+                                <span
+                                    id="node-display-host"
+                                    class="header-node-host"
+                                ></span>
+                                <span
+                                    id="node-display-value"
+                                    class="header-node-ips"
+                                ></span>
+                            </button>
+                        </div>
                     </div>
                     <div class="header-controls">
                         <!-- Refresh Button -->
@@ -475,6 +491,110 @@
                     </div>
                 </section>
             </main>
+
+            <!-- ═══ Node Info Modal ═══ -->
+            <div class="modal-overlay" id="node-info-overlay">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3 class="modal-title">
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <circle cx="12" cy="12" r="10" />
+                                <path d="M12 16v-4" />
+                                <path d="M12 8h.01" />
+                            </svg>
+                            <span>Node addresses</span>
+                        </h3>
+                        <button
+                            class="btn btn-ghost btn-icon"
+                            id="node-info-close"
+                            title="Close"
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="node-info-grid" id="node-info-grid"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" id="node-info-done">
+                            Done
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ Connection Copy Modal ═══ -->
+            <div class="modal-overlay" id="connection-overlay">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3 class="modal-title">
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <circle cx="12" cy="12" r="10" />
+                                <path d="M8 12h8" />
+                                <path d="M12 8v8" />
+                            </svg>
+                            <span id="connection-title">Connection</span>
+                        </h3>
+                        <button
+                            class="btn btn-ghost btn-icon"
+                            id="connection-close"
+                            title="Close"
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="copy-grid" id="connection-grid"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" id="connection-done">
+                            Done
+                        </button>
+                    </div>
+                </div>
+            </div>
 
             <!-- ═══ Test Connection Modal ═══ -->
             <div class="modal-overlay" id="test-overlay">
