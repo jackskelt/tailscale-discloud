@@ -14,7 +14,6 @@ fn tunnels_path() -> String {
 
 pub type SharedState = Arc<RwLock<Vec<Tunnel>>>;
 
-const DEFAULT_TAILSCALE_HOSTNAME: &str = "tailscale-discloud";
 const TAILSCALED_SOCKET_ENV: &str = "TAILSCALE_SOCKET";
 const DEFAULT_TAILSCALED_SOCKET: &str = "/var/run/tailscale/tailscaled.sock";
 const LOCALAPI_HOST_HEADER: &str = "local-tailscaled.sock";
@@ -41,12 +40,6 @@ struct LocalApiSelf {
     dns_name: Option<String>,
     #[serde(rename = "TailscaleIPs")]
     tailscale_ips: Vec<String>,
-}
-
-/// Return the fallback hostname from the environment variable
-/// `TAILSCALE_HOSTNAME`, falling back to `"tailscale-discloud"`.
-pub fn get_env_hostname() -> String {
-    std::env::var("TAILSCALE_HOSTNAME").unwrap_or_else(|_| DEFAULT_TAILSCALE_HOSTNAME.to_string())
 }
 
 fn tailscaled_socket_path() -> String {
@@ -102,35 +95,6 @@ pub async fn get_local_node_info() -> Result<LocalNodeInfo, String> {
         ipv4,
         ipv6,
     })
-}
-
-/// Build a connection URL for a tunnel: `<hostname>:<local_port>`.
-/// Returns `Some(url)` when the tunnel is enabled, `None` otherwise.
-pub fn connection_url_for(tunnel: &Tunnel, hostname: &str) -> Option<String> {
-    if tunnel.enabled {
-        Some(format!("{}:{}", hostname, tunnel.local_port))
-    } else {
-        None
-    }
-}
-
-/// Resolve the current MagicDNS hostname from LocalAPI, falling back to env.
-pub async fn get_runtime_magicdns_hostname() -> String {
-    match get_local_node_info().await {
-        Ok(info) => {
-            if !info.magicdns_hostname.is_empty() {
-                info.magicdns_hostname
-            } else if !info.dns_name.is_empty() {
-                info.dns_name
-            } else {
-                get_env_hostname()
-            }
-        }
-        Err(e) => {
-            eprintln!("[localapi] {e} — falling back to env hostname");
-            get_env_hostname()
-        }
-    }
 }
 
 fn trim_trailing_dot(s: &str) -> &str {

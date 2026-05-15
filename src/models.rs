@@ -20,15 +20,11 @@ pub struct Tunnel {
 }
 
 /// The response returned for a single tunnel (create / update / toggle).
-/// Wraps the core Tunnel with computed fields and optional warnings.
+/// Wraps the core Tunnel with optional warnings.
 #[derive(Debug, Clone, Serialize)]
 pub struct TunnelResponse {
     #[serde(flatten)]
     pub tunnel: Tunnel,
-    /// Connection URL for this tunnel, e.g. "tailscale:5432".
-    /// Only present when the tunnel is enabled.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub connection_url: Option<String>,
     /// Optional warning message (the tunnel was created/updated but
     /// something non-fatal was detected, such as the target port not
     /// responding).
@@ -37,13 +33,10 @@ pub struct TunnelResponse {
 }
 
 /// The response returned for listing tunnels.
-/// Each item augments the core Tunnel with the connection URL.
 #[derive(Debug, Clone, Serialize)]
 pub struct TunnelListItem {
     #[serde(flatten)]
     pub tunnel: Tunnel,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub connection_url: Option<String>,
 }
 
 /// A structured message with an i18n key and interpolation parameters.

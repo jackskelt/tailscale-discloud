@@ -465,7 +465,8 @@ async function onCreateSubmit(e) {
       body: JSON.stringify(data),
     });
 
-    // The backend returns a TunnelResponse with { ...tunnel, connection_url, warning }
+    // The backend returns a TunnelResponse with { ...tunnel, warning }
+
     const tunnel = extractTunnel(result);
     tunnels.push(tunnel);
     renderTunnels();
@@ -764,14 +765,11 @@ function applySuggestion(index) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Extract the flat tunnel object from a TunnelResponse (which may have
- * flattened tunnel fields alongside `connection_url` and `warning`).
- * We keep `connection_url` on the tunnel for rendering.
+ * Extract the flat tunnel object from a TunnelResponse (which may include
+ * warnings alongside tunnel fields).
  */
 function extractTunnel(response) {
   if (!response) return response;
-  // The backend flattens tunnel fields into the response root,
-  // so we just pass through and keep connection_url.
   return response;
 }
 
@@ -973,9 +971,7 @@ function getConnectionUrl(tun) {
   if (!tun.enabled) return null;
 
   const host = getPreferredNodeHost();
-  if (host) return `${host}:${tun.local_port}`;
-
-  return tun.connection_url || null;
+  return host ? `${host}:${tun.local_port}` : null;
 }
 
 /**

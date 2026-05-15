@@ -18,6 +18,10 @@ fn clickable_terminal_link(url: &str) -> String {
     format!("\x1b]8;;{url}\x1b\\{url}\x1b]8;;\x1b\\")
 }
 
+fn print_link(label: &str, url: &str) {
+    println!("  - {label}: {}", clickable_terminal_link(url));
+}
+
 #[tokio::main]
 async fn main() {
     println!("[main] Tailscale Tunnel Manager starting...");
@@ -49,22 +53,22 @@ async fn main() {
     match get_local_node_info().await {
         Ok(config) => {
             println!("[main] You can connect to this node using:");
-            println!(
-                "  - Hostname: {}",
-                clickable_terminal_link(&format!("http://{}:3000/", config.dns_name))
-            );
-            println!(
-                "  - MagicDNS: {}",
-                clickable_terminal_link(&format!("http://{}:3000/", config.magicdns_hostname))
-            );
-            println!(
-                "  - IPv4: {}",
-                clickable_terminal_link(&format!("http://{}:3000/", config.ipv4))
-            );
-            println!(
-                "  - IPv6: {}",
-                clickable_terminal_link(&format!("http://[{}]:3000/", config.ipv6))
-            );
+
+            if !config.dns_name.is_empty() {
+                print_link("DNSName", &format!("http://{}:3000/", config.dns_name));
+            }
+            if !config.magicdns_hostname.is_empty() {
+                print_link(
+                    "MagicDNS",
+                    &format!("http://{}:3000/", config.magicdns_hostname),
+                );
+            }
+            if !config.ipv4.is_empty() {
+                print_link("IPv4", &format!("http://{}:3000/", config.ipv4));
+            }
+            if !config.ipv6.is_empty() {
+                print_link("IPv6", &format!("http://[{}]:3000/", config.ipv6));
+            }
         }
         Err(e) => eprintln!("[main] Failed to read LocalAPI node info: {e}"),
     }

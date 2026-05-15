@@ -13,9 +13,8 @@ use crate::models::{
     UpdateTunnelRequest,
 };
 use crate::state::{
-    check_target_reachability, connection_url_for, get_env_hostname, get_local_node_info,
-    get_runtime_magicdns_hostname, is_loopback_host, is_port_available, kill_socat, save_tunnels,
-    spawn_socat, test_connection, SharedState,
+    check_target_reachability, get_local_node_info, is_loopback_host, is_port_available,
+    kill_socat, save_tunnels, spawn_socat, test_connection, SharedState,
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -66,13 +65,8 @@ pub async fn get_config() -> Json<ConfigResponse> {
     let (magicdns_hostname, dns_name, ipv4, ipv6) = match get_local_node_info().await {
         Ok(info) => (info.magicdns_hostname, info.dns_name, info.ipv4, info.ipv6),
         Err(e) => {
-            eprintln!("[GET /api/config] {e} — falling back to env hostname");
-            (
-                get_env_hostname(),
-                String::new(),
-                String::new(),
-                String::new(),
-            )
+            eprintln!("[GET /api/config] {e} — MagicDNS unavailable");
+            (String::new(), String::new(), String::new(), String::new())
         }
     };
 
@@ -92,14 +86,9 @@ pub async fn list_tunnels(State(state): State<SharedState>) -> Json<Vec<TunnelLi
     let tunnels = state.read().await;
     println!("[GET /api/tunnels] Returning {} tunnel(s)", tunnels.len());
 
-    let hostname = get_runtime_magicdns_hostname().await;
-
     let items: Vec<TunnelListItem> = tunnels
         .iter()
-        .map(|t| TunnelListItem {
-            connection_url: connection_url_for(t, &hostname),
-            tunnel: t.clone(),
-        })
+        .map(|t| TunnelListItem { tunnel: t.clone() })
         .collect();
 
     Json(items)
@@ -286,12 +275,7 @@ pub async fn create_tunnel(
         tunnel.name, tunnel.id
     );
 
-    let hostname = get_runtime_magicdns_hostname().await;
-    let response = TunnelResponse {
-        connection_url: connection_url_for(&tunnel, &hostname),
-        tunnel,
-        warning,
-    };
+    let response = TunnelResponse { tunnel, warning };
 
     Ok((StatusCode::CREATED, Json(response)))
 }
@@ -494,9 +478,7 @@ pub async fn update_tunnel(
         updated.name, updated.enabled
     );
 
-    let hostname = get_runtime_magicdns_hostname().await;
     let response = TunnelResponse {
-        connection_url: connection_url_for(&updated, &hostname),
         tunnel: updated,
         warning,
     };
