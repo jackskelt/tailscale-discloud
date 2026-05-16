@@ -34,18 +34,23 @@ fn tailscaled_socket_path() -> String {
 
 /// Fetch the current node info from the Tailscale LocalAPI.
 pub async fn get_local_node_info() -> Result<LocalNodeInfo, String> {
-    use hyper::{Body, Client, Request};
-    use hyperlocal::{UnixClientExt, Uri};
+    use bytes::Bytes;
+    use http_body_util::{BodyExt, Empty};
+    use hyper::Request;
+    use hyper_util::client::legacy::Client;
+    use hyper_util::rt::TokioExecutor;
+    use hyperlocal::{UnixConnector, Uri};
 
     let socket_path = tailscaled_socket_path();
-    let client: Client<_, Body> = Client::unix();
+    let client: Client<UnixConnector, Empty<Bytes>> =
+        Client::builder(TokioExecutor::new()).build(UnixConnector);
     let uri: hyper::Uri = Uri::new(socket_path, "/localapi/v0/status").into();
 
     let req = Request::builder()
         .method("GET")
         .uri(uri)
         .header("Host", LOCALAPI_HOST_HEADER)
-        .body(Body::empty())
+        .body(Empty::<Bytes>::new())
         .map_err(|e| format!("[localapi] Request build failed: {e}"))?;
 
     let res = client
@@ -54,9 +59,12 @@ pub async fn get_local_node_info() -> Result<LocalNodeInfo, String> {
         .map_err(|e| format!("[localapi] Request failed: {e}"))?;
 
     let status = res.status();
-    let body = hyper::body::to_bytes(res.into_body())
+    let body = res
+        .into_body()
+        .collect()
         .await
-        .map_err(|e| format!("[localapi] Read body failed: {e}"))?;
+        .map_err(|e| format!("[localapi] Read body failed: {e}"))?
+        .to_bytes();
 
     if !status.is_success() {
         let body_str = String::from_utf8_lossy(&body);

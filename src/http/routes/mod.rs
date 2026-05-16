@@ -18,7 +18,7 @@ pub fn router(state: SharedState) -> Router {
             get(tunnels::list_tunnels).post(tunnels::create_tunnel),
         )
         .route(
-            "/api/tunnels/:id",
+            "/api/tunnels/{id}",
             put(tunnels::update_tunnel).delete(tunnels::delete_tunnel),
         )
         .route("/api/test", post(test::test_endpoint))
