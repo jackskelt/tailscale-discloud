@@ -7,14 +7,16 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::models::{
-    ApiErrorResponse, ApiMessage, ConfigResponse, CreateTunnelRequest, ReachabilityResult,
-    TestConnectionRequest, TestConnectionResponse, TunnelListItem, TunnelResponse,
-    UpdateTunnelRequest,
-};
-use crate::state::{
-    check_target_reachability, get_local_node_info, is_loopback_host, is_port_available,
-    kill_socat, save_tunnels, spawn_socat, test_connection, SharedState,
+use crate::http::errors::{ApiErrorResponse, ApiMessage};
+
+use crate::net::reachability::{check_target_reachability, ReachabilityResult};
+
+use crate::net::utils::{is_loopback_host, is_port_available};
+
+use crate::storage::tunnels_json::save_tunnels;
+use crate::tunnels::service::{kill_socat, spawn_socat};
+use crate::tunnels::{
+    CreateTunnelRequest, SharedState, Tunnel, TunnelListItem, TunnelResponse, UpdateTunnelRequest,
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────
@@ -57,29 +59,6 @@ fn params2(
 
 type ApiResult<T> = Result<T, (StatusCode, Json<ApiErrorResponse>)>;
 
-// ─── GET /api/config ─────────────────────────────────────────────────────
-
-pub async fn get_config() -> Json<ConfigResponse> {
-    let version = env!("CARGO_PKG_VERSION").to_string();
-
-    let (magicdns_hostname, dns_name, ipv4, ipv6) = match get_local_node_info().await {
-        Ok(info) => (info.magicdns_hostname, info.dns_name, info.ipv4, info.ipv6),
-        Err(e) => {
-            eprintln!("[GET /api/config] {e} — MagicDNS unavailable");
-            (String::new(), String::new(), String::new(), String::new())
-        }
-    };
-
-    println!("[GET /api/config] magicdns={magicdns_hostname} dns_name={dns_name} ipv4={ipv4} ipv6={ipv6} version={version}");
-    Json(ConfigResponse {
-        magicdns_hostname,
-        dns_name,
-        ipv4,
-        ipv6,
-        version,
-    })
-}
-
 // ─── GET /api/tunnels ────────────────────────────────────────────────────
 
 pub async fn list_tunnels(State(state): State<SharedState>) -> Json<Vec<TunnelListItem>> {
@@ -94,7 +73,7 @@ pub async fn list_tunnels(State(state): State<SharedState>) -> Json<Vec<TunnelLi
     Json(items)
 }
 
-// ─── POST /api/tunnels ──────────────────────────────────────────────────
+// ─── POST /api/tunnels ───────────────────────────────────────────────────
 
 pub async fn create_tunnel(
     State(state): State<SharedState>,
@@ -186,7 +165,7 @@ pub async fn create_tunnel(
     }
 
     // ── Build tunnel struct ─────────────────────────────────────────────
-    let mut tunnel = crate::models::Tunnel {
+    let mut tunnel = Tunnel {
         id: Uuid::new_v4().to_string(),
         name: payload.name.trim().to_string(),
         local_port: payload.local_port,
@@ -280,7 +259,7 @@ pub async fn create_tunnel(
     Ok((StatusCode::CREATED, Json(response)))
 }
 
-// ─── PUT /api/tunnels/:id ───────────────────────────────────────────────
+// ─── PUT /api/tunnels/:id ────────────────────────────────────────────────
 
 pub async fn update_tunnel(
     State(state): State<SharedState>,
@@ -486,7 +465,7 @@ pub async fn update_tunnel(
     Ok(Json(response))
 }
 
-// ─── DELETE /api/tunnels/:id ────────────────────────────────────────────
+// ─── DELETE /api/tunnels/:id ─────────────────────────────────────────────
 
 pub async fn delete_tunnel(
     State(state): State<SharedState>,
@@ -528,26 +507,4 @@ pub async fn delete_tunnel(
     println!("[DELETE /api/tunnels/{id}] Deleted tunnel '{name}'");
 
     Ok(StatusCode::NO_CONTENT)
-}
-
-// ─── POST /api/test ─────────────────────────────────────────────────────
-
-pub async fn test_endpoint(
-    Json(payload): Json<TestConnectionRequest>,
-) -> Json<TestConnectionResponse> {
-    println!(
-        "[POST /api/test] target={}:{}",
-        payload.target_host, payload.target_port
-    );
-
-    let (success, log) = test_connection(&payload.target_host, payload.target_port).await;
-
-    println!(
-        "[POST /api/test] {}:{} -> {}",
-        payload.target_host,
-        payload.target_port,
-        if success { "OK" } else { "FAIL" }
-    );
-
-    Json(TestConnectionResponse { success, log })
 }

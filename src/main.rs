@@ -1,17 +1,14 @@
-mod models;
-mod routes;
-mod state;
-
 use std::sync::Arc;
 
-use axum::{routing::get, routing::post, routing::put, Router};
+use axum::Router;
 use tokio::sync::RwLock;
-use tower_http::services::ServeDir;
 
-use crate::routes::{
-    create_tunnel, delete_tunnel, get_config, list_tunnels, test_endpoint, update_tunnel,
-};
-use crate::state::{get_local_node_info, load_tunnels, restore_tunnels, SharedState};
+use tailscale_tunnel_manager::http::routes::router;
+use tailscale_tunnel_manager::storage::tunnels_json::load_tunnels;
+use tailscale_tunnel_manager::tunnels::service::restore_tunnels;
+use tailscale_tunnel_manager::tunnels::SharedState;
+
+use tailscale_tunnel_manager::tailscale::localapi::get_local_node_info;
 
 fn clickable_terminal_link(url: &str) -> String {
     // For terminals that support OSC 8 hyperlinks (most Unix terminals), format the URL as a clickable link.
@@ -35,17 +32,8 @@ async fn main() {
     // Restore enabled tunnels
     restore_tunnels(&state).await;
 
-    // Serve static frontend files from public/
-    let serve_dir = ServeDir::new("./public/");
-
     // Build full application with flat routes
-    let app = Router::new()
-        .route("/api/config", get(get_config))
-        .route("/api/tunnels", get(list_tunnels).post(create_tunnel))
-        .route("/api/tunnels/:id", put(update_tunnel).delete(delete_tunnel))
-        .route("/api/test", post(test_endpoint))
-        .with_state(state)
-        .fallback_service(serve_dir);
+    let app: Router = router(state);
 
     let bind_addr = "0.0.0.0:3000";
     println!("[main] Listening on {bind_addr}");
