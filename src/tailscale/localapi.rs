@@ -42,6 +42,8 @@ pub async fn get_local_node_info() -> Result<LocalNodeInfo, String> {
     use hyperlocal::{UnixConnector, Uri};
 
     let socket_path = tailscaled_socket_path();
+    tracing::trace!(socket_path = %socket_path, "Building legacy hyperlocal Unix client");
+
     let client: Client<UnixConnector, Empty<Bytes>> =
         Client::builder(TokioExecutor::new()).build(UnixConnector);
     let uri: hyper::Uri = Uri::new(socket_path, "/localapi/v0/status").into();
@@ -51,30 +53,48 @@ pub async fn get_local_node_info() -> Result<LocalNodeInfo, String> {
         .uri(uri)
         .header("Host", LOCALAPI_HOST_HEADER)
         .body(Empty::<Bytes>::new())
-        .map_err(|e| format!("[localapi] Request build failed: {e}"))?;
+        .map_err(|e| {
+            let msg = format!("[localapi] Request build failed: {e}");
+            tracing::warn!(error = %e, "LocalAPI request build failed");
+            msg
+        })?;
 
+    tracing::debug!("Sending GET request to local tailscaled status endpoint");
     let res = client
         .request(req)
         .await
-        .map_err(|e| format!("[localapi] Request failed: {e}"))?;
+        .map_err(|e| {
+            let msg = format!("[localapi] Request failed: {e}");
+            tracing::warn!(error = %e, "LocalAPI connection or request failed");
+            msg
+        })?;
 
     let status = res.status();
+    tracing::trace!(http_status = %status, "Received response headers from LocalAPI");
+
     let body = res
         .into_body()
         .collect()
         .await
-        .map_err(|e| format!("[localapi] Read body failed: {e}"))?
+        .map_err(|e| {
+            let msg = format!("[localapi] Read body failed: {e}");
+            tracing::error!(error = %e, "Failed to read LocalAPI response body");
+            msg
+        })?
         .to_bytes();
 
     if !status.is_success() {
         let body_str = String::from_utf8_lossy(&body);
-        return Err(format!(
-            "[localapi] HTTP {status} while reading status: {body_str}"
-        ));
+        let msg = format!("[localapi] HTTP {status} while reading status: {body_str}");
+        tracing::warn!(http_status = %status, body = %body_str, "LocalAPI returned error status");
+        return Err(msg);
     }
 
-    let parsed: LocalApiStatus =
-        serde_json::from_slice(&body).map_err(|e| format!("[localapi] JSON parse failed: {e}"))?;
+    let parsed: LocalApiStatus = serde_json::from_slice(&body).map_err(|e| {
+        let msg = format!("[localapi] JSON parse failed: {e}");
+        tracing::error!(error = %e, "Failed to parse LocalAPI JSON response");
+        msg
+    })?;
 
     let dns_name =
         trim_trailing_dot(parsed.self_node.dns_name.as_deref().unwrap_or("").trim()).to_string();
@@ -82,6 +102,14 @@ pub async fn get_local_node_info() -> Result<LocalNodeInfo, String> {
         derive_magicdns_hostname(&dns_name, parsed.magicdns_suffix.as_deref().unwrap_or(""));
 
     let (ipv4, ipv6) = split_ips(&parsed.self_node.tailscale_ips);
+
+    tracing::debug!(
+        magicdns_hostname = %magicdns_hostname,
+        dns_name = %dns_name,
+        ipv4 = %ipv4,
+        ipv6 = %ipv6,
+        "Successfully parsed LocalNodeInfo from LocalAPI"
+    );
 
     Ok(LocalNodeInfo {
         magicdns_hostname,

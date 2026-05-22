@@ -21,13 +21,23 @@ pub fn is_loopback_host(host: &str) -> bool {
 
 /// Check whether a given TCP port is available by attempting to bind to it.
 pub async fn is_port_available(port: u16) -> bool {
-    TcpListener::bind(("0.0.0.0", port)).await.is_ok()
+    let is_avail = TcpListener::bind(("0.0.0.0", port)).await.is_ok();
+    tracing::trace!(
+        port = port,
+        available = is_avail,
+        "Port availability check result"
+    );
+    is_avail
 }
 
 /// Test connectivity to a host:port using `nc -zvw3`.
 /// Returns `(success, combined_log)`.
 pub async fn test_connection(target_host: &str, target_port: u16) -> (bool, String) {
-    println!("[test] Testing connection to {target_host}:{target_port}");
+    tracing::debug!(
+        target_host = %target_host,
+        target_port = target_port,
+        "Running netcat connection test"
+    );
 
     let result = Command::new("nc")
         .arg("-zvw3")
@@ -71,16 +81,25 @@ pub async fn test_connection(target_host: &str, target_port: u16) -> (bool, Stri
             }
 
             if success {
-                println!("[test] {target_host}:{target_port} — OK");
+                tracing::debug!(
+                    target_host = %target_host,
+                    target_port = target_port,
+                    "Connection test succeeded"
+                );
             } else {
-                eprintln!("[test] {target_host}:{target_port} — FAILED: {log}");
+                tracing::debug!(
+                    target_host = %target_host,
+                    target_port = target_port,
+                    log = %log,
+                    "Connection test failed"
+                );
             }
 
             (success, log)
         }
         Err(e) => {
             let msg = format!("Failed to run nc: {e}");
-            eprintln!("[test] {msg}");
+            tracing::error!(error = %e, "Failed to execute nc subprocess");
             (false, msg)
         }
     }

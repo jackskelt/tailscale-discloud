@@ -21,18 +21,13 @@ pub struct TestConnectionResponse {
 pub async fn test_endpoint(
     Json(payload): Json<TestConnectionRequest>,
 ) -> Json<TestConnectionResponse> {
-    println!(
-        "[POST /api/test] target={}:{}",
-        payload.target_host, payload.target_port
-    );
-
     let (success, log) = test_connection(&payload.target_host, payload.target_port).await;
 
-    println!(
-        "[POST /api/test] {}:{} -> {}",
-        payload.target_host,
-        payload.target_port,
-        if success { "OK" } else { "FAIL" }
+    tracing::debug!(
+        target_host = %payload.target_host,
+        target_port = payload.target_port,
+        success = success,
+        "Completed test connection endpoint check"
     );
 
     Json(TestConnectionResponse { success, log })

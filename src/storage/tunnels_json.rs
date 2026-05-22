@@ -8,14 +8,19 @@ fn tunnels_path() -> String {
 /// Returns an empty vec if the file doesn't exist or is invalid.
 pub async fn load_tunnels() -> Vec<Tunnel> {
     let path = tunnels_path();
+    tracing::debug!(path = %path, "Loading persisted tunnels from disk");
+
     match tokio::fs::read_to_string(&path).await {
         Ok(contents) => {
             let tunnels: Vec<Tunnel> = serde_json::from_str(&contents).unwrap_or_default();
-            println!("[state] Loaded {} tunnel(s) from {}", tunnels.len(), path);
+            tracing::debug!(
+                count = tunnels.len(),
+                "Successfully loaded tunnels from disk"
+            );
             tunnels
         }
         Err(e) => {
-            eprintln!("[state] Could not read {path}: {e} — starting with empty list");
+            tracing::warn!(path = %path, error = %e, "Could not read tunnels file; starting with empty list");
             Vec::new()
         }
     }
@@ -25,18 +30,20 @@ pub async fn load_tunnels() -> Vec<Tunnel> {
 /// PID fields are skipped during serialization automatically.
 pub async fn save_tunnels(tunnels: &[Tunnel]) -> Result<(), String> {
     let path = tunnels_path();
+    tracing::debug!(path = %path, count = tunnels.len(), "Saving tunnels to disk");
+
     let json = serde_json::to_string_pretty(tunnels).map_err(|e| {
-        let msg = format!("[state] JSON serialization error: {e}");
-        eprintln!("{msg}");
+        let msg = format!("JSON serialization error: {e}");
+        tracing::error!(error = %e, "Failed to serialize tunnels to JSON");
         msg
     })?;
 
     tokio::fs::write(&path, json).await.map_err(|e| {
-        let msg = format!("[state] Failed to write {path}: {e}");
-        eprintln!("{msg}");
+        let msg = format!("Failed to write {path}: {e}");
+        tracing::error!(path = %path, error = %e, "Failed to write tunnels JSON to file");
         msg
     })?;
 
-    println!("[state] Persisted {} tunnel(s) to {}", tunnels.len(), path);
+    tracing::debug!(path = %path, "Successfully saved tunnels to disk");
     Ok(())
 }

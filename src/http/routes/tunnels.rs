@@ -63,7 +63,7 @@ type ApiResult<T> = Result<T, (StatusCode, Json<ApiErrorResponse>)>;
 
 pub async fn list_tunnels(State(state): State<SharedState>) -> Json<Vec<TunnelListItem>> {
     let tunnels = state.read().await;
-    println!("[GET /api/tunnels] Returning {} tunnel(s)", tunnels.len());
+    tracing::debug!("Returning {} tunnel(s)", tunnels.len());
 
     let items: Vec<TunnelListItem> = tunnels
         .iter()
@@ -79,14 +79,18 @@ pub async fn create_tunnel(
     State(state): State<SharedState>,
     Json(payload): Json<CreateTunnelRequest>,
 ) -> ApiResult<(StatusCode, Json<TunnelResponse>)> {
-    println!(
-        "[POST /api/tunnels] name='{}' local_port={} target={}:{} enabled={}",
-        payload.name, payload.local_port, payload.target_host, payload.target_port, payload.enabled
+    tracing::info!(
+        name = payload.name,
+        local_port = payload.local_port,
+        target_host = payload.target_host,
+        target_port = payload.target_port,
+        enabled = payload.enabled,
+        "Create Tunnel",
     );
 
     // ── Validation ──────────────────────────────────────────────────────
     if payload.name.trim().is_empty() {
-        eprintln!("[POST /api/tunnels] Rejected: empty name");
+        tracing::debug!("Rejected: empty name");
         return Err((
             StatusCode::BAD_REQUEST,
             Json(api_err("api.error.name_empty")),
@@ -94,7 +98,7 @@ pub async fn create_tunnel(
     }
 
     if payload.target_host.trim().is_empty() {
-        eprintln!("[POST /api/tunnels] Rejected: empty target_host");
+        tracing::debug!("Rejected: empty target_host");
         return Err((
             StatusCode::BAD_REQUEST,
             Json(api_err("api.error.target_host_empty")),
@@ -102,7 +106,7 @@ pub async fn create_tunnel(
     }
 
     if payload.local_port == 0 {
-        eprintln!("[POST /api/tunnels] Rejected: local_port is 0");
+        tracing::debug!("Rejected: local_port is 0");
         return Err((
             StatusCode::BAD_REQUEST,
             Json(api_err("api.error.local_port_range")),
@@ -110,7 +114,7 @@ pub async fn create_tunnel(
     }
 
     if payload.target_port == 0 {
-        eprintln!("[POST /api/tunnels] Rejected: target_port is 0");
+        tracing::debug!("Rejected: target_port is 0");
         return Err((
             StatusCode::BAD_REQUEST,
             Json(api_err("api.error.target_port_range")),
@@ -119,9 +123,10 @@ pub async fn create_tunnel(
 
     // ── Self-loop detection ─────────────────────────────────────────────
     if payload.local_port == payload.target_port && is_loopback_host(&payload.target_host) {
-        eprintln!(
-            "[POST /api/tunnels] Rejected: self-loop (localhost:{} -> localhost:{})",
-            payload.local_port, payload.target_port
+        tracing::debug!(
+            "Rejected: self-loop (localhost:{} -> localhost:{})",
+            payload.local_port,
+            payload.target_port
         );
         return Err((
             StatusCode::BAD_REQUEST,
@@ -134,8 +139,8 @@ pub async fn create_tunnel(
 
     // ── Port availability (system-level) ────────────────────────────────
     if !is_port_available(payload.local_port).await {
-        eprintln!(
-            "[POST /api/tunnels] Rejected: port {} is in use on the system",
+        tracing::debug!(
+            "Rejected: port {} is in use on the system",
             payload.local_port
         );
         return Err((
@@ -151,8 +156,8 @@ pub async fn create_tunnel(
 
     // ── Port availability (within our state) ────────────────────────────
     if tunnels.iter().any(|t| t.local_port == payload.local_port) {
-        eprintln!(
-            "[POST /api/tunnels] Rejected: port {} already assigned to another tunnel",
+        tracing::debug!(
+            "Rejected: port {} already assigned to another tunnel",
             payload.local_port
         );
         return Err((
@@ -188,9 +193,10 @@ pub async fn create_tunnel(
             }
             ReachabilityResult::HostReachablePortClosed => {
                 // Host responds but nothing on that port — warn, continue.
-                println!(
-                    "[POST /api/tunnels] Warning: {}:{} — host reachable but port closed",
-                    tunnel.target_host, tunnel.target_port
+                tracing::debug!(
+                    "{}:{} — host reachable but port closed",
+                    tunnel.target_host,
+                    tunnel.target_port
                 );
                 tunnel.warning_id = Some("api.warning.port_closed".to_string());
                 warning = Some(ApiMessage::with_params(
@@ -204,8 +210,8 @@ pub async fn create_tunnel(
                 ));
             }
             ReachabilityResult::HostUnreachable(reason) => {
-                eprintln!(
-                    "[POST /api/tunnels] Rejected: host {} unreachable — {reason}",
+                tracing::debug!(
+                    "Rejected: host {} unreachable — {reason}",
                     tunnel.target_host
                 );
                 return Err((
@@ -220,17 +226,11 @@ pub async fn create_tunnel(
 
         match spawn_socat(tunnel.local_port, &tunnel.target_host, tunnel.target_port).await {
             Ok(pid) => {
-                println!(
-                    "[POST /api/tunnels] socat started for '{}' with PID {}",
-                    tunnel.name, pid
-                );
+                tracing::debug!("socat started for '{}' with PID {}", tunnel.name, pid);
                 tunnel.pid = Some(pid);
             }
             Err(e) => {
-                eprintln!(
-                    "[POST /api/tunnels] socat failed for '{}': {e}",
-                    tunnel.name
-                );
+                tracing::error!("socat failed for '{}': {e}", tunnel.name);
                 return Err((
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(api_err_params(
@@ -246,13 +246,10 @@ pub async fn create_tunnel(
 
     // ── Persist ─────────────────────────────────────────────────────────
     if let Err(e) = save_tunnels(&tunnels).await {
-        eprintln!("[POST /api/tunnels] Persistence failed (tunnel IS running): {e}");
+        tracing::error!("Persistence failed (tunnel IS running): {e}");
     }
 
-    println!(
-        "[POST /api/tunnels] Created tunnel '{}' id={}",
-        tunnel.name, tunnel.id
-    );
+    tracing::info!("Created tunnel '{}' id={}", tunnel.name, tunnel.id);
 
     let response = TunnelResponse { tunnel, warning };
 
@@ -266,12 +263,12 @@ pub async fn update_tunnel(
     Path(id): Path<String>,
     Json(payload): Json<UpdateTunnelRequest>,
 ) -> ApiResult<Json<TunnelResponse>> {
-    println!("[PUT /api/tunnels/{id}] payload: {payload:?}");
+    tracing::debug!("payload: {payload:?}");
 
     let mut tunnels = state.write().await;
 
     let index = tunnels.iter().position(|t| t.id == id).ok_or_else(|| {
-        eprintln!("[PUT /api/tunnels/{id}] Not found");
+        tracing::error!("Not found");
         (
             StatusCode::NOT_FOUND,
             Json(api_err_params(
@@ -305,10 +302,7 @@ pub async fn update_tunnel(
             .enumerate()
             .any(|(i, t)| i != index && t.local_port == new_local_port)
         {
-            eprintln!(
-                "[PUT /api/tunnels/{id}] Port {} already assigned to another tunnel",
-                new_local_port
-            );
+            tracing::debug!("Port {} already assigned to another tunnel", new_local_port);
             return Err((
                 StatusCode::CONFLICT,
                 Json(api_err_params(
@@ -319,10 +313,7 @@ pub async fn update_tunnel(
         }
 
         if !is_port_available(new_local_port).await {
-            eprintln!(
-                "[PUT /api/tunnels/{id}] Port {} in use on the system",
-                new_local_port
-            );
+            tracing::debug!("Port {} in use on the system", new_local_port);
             return Err((
                 StatusCode::CONFLICT,
                 Json(api_err_params(
@@ -335,9 +326,10 @@ pub async fn update_tunnel(
 
     // ── Self-loop detection ─────────────────────────────────────────────
     if new_local_port == new_target_port && is_loopback_host(&new_target_host) {
-        eprintln!(
-            "[PUT /api/tunnels/{id}] Rejected: self-loop (localhost:{} -> localhost:{})",
-            new_local_port, new_target_port
+        tracing::error!(
+            "Rejected: self-loop (localhost:{} -> localhost:{})",
+            new_local_port,
+            new_target_port
         );
         return Err((
             StatusCode::BAD_REQUEST,
@@ -369,8 +361,8 @@ pub async fn update_tunnel(
                 warning_key = None;
             }
             ReachabilityResult::HostReachablePortClosed => {
-                println!(
-                    "[PUT /api/tunnels/{id}] Warning: {new_target_host}:{new_target_port} — host reachable but port closed"
+                tracing::debug!(
+                    "{new_target_host}:{new_target_port} — host reachable but port closed"
                 );
                 warning_key = Some("api.warning.port_closed".to_string());
                 warning = Some(ApiMessage::with_params(
@@ -379,9 +371,7 @@ pub async fn update_tunnel(
                 ));
             }
             ReachabilityResult::HostUnreachable(reason) => {
-                eprintln!(
-                    "[PUT /api/tunnels/{id}] Rejected: host {new_target_host} unreachable — {reason}"
-                );
+                tracing::debug!("Rejected: host {new_target_host} unreachable — {reason}");
                 return Err((
                     StatusCode::BAD_GATEWAY,
                     Json(api_err_params(
@@ -396,9 +386,9 @@ pub async fn update_tunnel(
     // ── Kill old socat ──────────────────────────────────────────────────
     let old_pid = tunnel.pid;
     if let Some(pid) = old_pid {
-        println!("[PUT /api/tunnels/{id}] Killing old socat PID {pid}");
+        tracing::debug!("Killing old socat PID {pid}");
         if let Err(e) = kill_socat(pid).await {
-            eprintln!("[PUT /api/tunnels/{id}] Failed to kill old socat PID {pid}: {e}");
+            tracing::error!("Failed to kill old socat PID {pid}: {e}");
         }
 
         // If the port didn't change, give the OS time to release it.
@@ -411,11 +401,11 @@ pub async fn update_tunnel(
     let new_pid = if new_enabled {
         match spawn_socat(new_local_port, &new_target_host, new_target_port).await {
             Ok(pid) => {
-                println!("[PUT /api/tunnels/{id}] socat started PID {pid}");
+                tracing::debug!("socat started PID {pid}");
                 Some(pid)
             }
             Err(e) => {
-                eprintln!("[PUT /api/tunnels/{id}] socat failed: {e}");
+                tracing::error!("socat failed: {e}");
                 return Err((
                     StatusCode::INTERNAL_SERVER_ERROR,
                     Json(api_err_params(
@@ -449,12 +439,13 @@ pub async fn update_tunnel(
 
     // ── Persist ─────────────────────────────────────────────────────────
     if let Err(e) = save_tunnels(&tunnels).await {
-        eprintln!("[PUT /api/tunnels/{id}] Persistence failed (tunnel IS running): {e}");
+        tracing::error!("Persistence failed (tunnel IS running): {e}");
     }
 
-    println!(
-        "[PUT /api/tunnels/{id}] Updated tunnel '{}' enabled={}",
-        updated.name, updated.enabled
+    tracing::info!(
+        "Updated tunnel '{}' enabled={}",
+        updated.name,
+        updated.enabled
     );
 
     let response = TunnelResponse {
@@ -471,12 +462,12 @@ pub async fn delete_tunnel(
     State(state): State<SharedState>,
     Path(id): Path<String>,
 ) -> ApiResult<StatusCode> {
-    println!("[DELETE /api/tunnels/{id}]");
+    tracing::info!("DELETE /api/tunnels/{}", id);
 
     let mut tunnels = state.write().await;
 
     let index = tunnels.iter().position(|t| t.id == id).ok_or_else(|| {
-        eprintln!("[DELETE /api/tunnels/{id}] Not found");
+        tracing::error!("Not found");
         (
             StatusCode::NOT_FOUND,
             Json(api_err_params(
@@ -491,9 +482,9 @@ pub async fn delete_tunnel(
 
     // ── Kill socat ──────────────────────────────────────────────────────
     if let Some(pid) = tunnel.pid {
-        println!("[DELETE /api/tunnels/{id}] Killing socat PID {pid}");
+        tracing::debug!("Killing socat PID {pid}");
         if let Err(e) = kill_socat(pid).await {
-            eprintln!("[DELETE /api/tunnels/{id}] Failed to kill socat PID {pid}: {e}");
+            tracing::error!("Failed to kill socat PID {pid}: {e}");
         }
     }
 
@@ -501,10 +492,10 @@ pub async fn delete_tunnel(
 
     // ── Persist ─────────────────────────────────────────────────────────
     if let Err(e) = save_tunnels(&tunnels).await {
-        eprintln!("[DELETE /api/tunnels/{id}] Persistence failed: {e}");
+        tracing::error!("Persistence failed: {e}");
     }
 
-    println!("[DELETE /api/tunnels/{id}] Deleted tunnel '{name}'");
+    tracing::debug!("Deleted tunnel '{}'", name);
 
     Ok(StatusCode::NO_CONTENT)
 }

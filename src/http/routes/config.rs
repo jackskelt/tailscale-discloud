@@ -24,12 +24,19 @@ pub async fn get_config() -> Json<ConfigResponse> {
     let (magicdns_hostname, dns_name, ipv4, ipv6) = match get_local_node_info().await {
         Ok(info) => (info.magicdns_hostname, info.dns_name, info.ipv4, info.ipv6),
         Err(e) => {
-            eprintln!("[GET /api/config] {e} — MagicDNS unavailable");
+            tracing::warn!(error = %e, "MagicDNS unavailable");
             (String::new(), String::new(), String::new(), String::new())
         }
     };
 
-    println!("[GET /api/config] magicdns={magicdns_hostname} dns_name={dns_name} ipv4={ipv4} ipv6={ipv6} version={version}");
+    tracing::debug!(
+        magicdns = %magicdns_hostname,
+        dns_name = %dns_name,
+        ipv4 = %ipv4,
+        ipv6 = %ipv6,
+        version = %version,
+        "Fetched local node configuration"
+    );
     Json(ConfigResponse {
         magicdns_hostname,
         dns_name,

@@ -24,7 +24,7 @@ pub async fn check_target_reachability(host: &str, port: u16) -> ReachabilityRes
     use tokio::time::{timeout, Duration};
 
     let addr = format!("{host}:{port}");
-    println!("[reachability] Checking {addr}");
+    tracing::debug!(address = %addr, "Initiating pre-flight TCP reachability check");
 
     match timeout(
         Duration::from_secs(3),
@@ -34,7 +34,7 @@ pub async fn check_target_reachability(host: &str, port: u16) -> ReachabilityRes
     {
         // Connected successfully — service is listening.
         Ok(Ok(_stream)) => {
-            println!("[reachability] {addr} — reachable, port open");
+            tracing::debug!(address = %addr, "Target is reachable and port is open");
             ReachabilityResult::Reachable
         }
         // Connection attempt returned an error within the timeout.
@@ -42,19 +42,19 @@ pub async fn check_target_reachability(host: &str, port: u16) -> ReachabilityRes
             let kind = e.kind();
             if kind == ErrorKind::ConnectionRefused {
                 // RST received → host is alive but port is closed.
-                println!("[reachability] {addr} — host reachable, port closed (ConnectionRefused)");
+                tracing::debug!(address = %addr, "Host is reachable but port is closed (ConnectionRefused)");
                 ReachabilityResult::HostReachablePortClosed
             } else {
                 // Any other error (DNS failure, no route, network
                 // unreachable, permission denied, …) → treat as
                 // host unreachable.
-                eprintln!("[reachability] {addr} — unreachable: {e} (kind={kind:?})");
+                tracing::debug!(address = %addr, error = %e, error_kind = ?kind, "Target is unreachable");
                 ReachabilityResult::HostUnreachable(e.to_string())
             }
         }
         // Timeout expired — host did not respond in time.
         Err(_) => {
-            eprintln!("[reachability] {addr} — unreachable: connection timed out");
+            tracing::debug!(address = %addr, "Target connection attempt timed out after 3 seconds");
             ReachabilityResult::HostUnreachable("Connection timed out".to_string())
         }
     }

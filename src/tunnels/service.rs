@@ -18,13 +18,20 @@ pub async fn spawn_socat(
     let listen_arg = format!("TCP-LISTEN:{local_port},fork,reuseaddr");
     let connect_arg = format!("TCP:{target_host}:{target_port}");
 
-    println!("[socat] Spawning: socat {listen_arg} {connect_arg}");
+    tracing::debug!(
+        local_port = local_port,
+        target = %format!("{target_host}:{target_port}"),
+        listen = %listen_arg,
+        connect = %connect_arg,
+        "Prepared command arguments for socat"
+    );
 
     use std::os::unix::process::CommandExt;
 
     let mut std_cmd = std::process::Command::new("socat");
     std_cmd.process_group(0);
 
+    tracing::trace!("Spawning socat process in new process group");
     let mut child = Command::from(std_cmd)
         .arg(&listen_arg)
         .arg(&connect_arg)
@@ -34,16 +41,22 @@ pub async fn spawn_socat(
         .kill_on_drop(false)
         .spawn()
         .map_err(|e| {
-            let msg = format!("[socat] Failed to spawn socat: {e}");
-            eprintln!("{msg}");
+            let msg = format!("Failed to spawn socat: {e}");
+            tracing::error!(error = %e, "Spawn error");
             msg
         })?;
 
-    let pid = child
-        .id()
-        .ok_or_else(|| "[socat] Failed to obtain socat PID".to_string())?;
+    let pid = child.id().ok_or_else(|| {
+        let msg = "Failed to obtain socat PID".to_string();
+        tracing::error!(msg);
+        msg
+    })?;
 
-    println!("[socat] Spawned with PID {pid} (and PGID {pid}), verifying it stays alive...");
+    tracing::debug!(
+        pid = pid,
+        local_port = local_port,
+        "Spawned socat process, waiting to verify it stays alive"
+    );
 
     tokio::time::sleep(std::time::Duration::from_millis(250)).await;
 
@@ -59,39 +72,47 @@ pub async fn spawn_socat(
             } else {
                 format!("exit {status}: {stderr_output}")
             };
-            let msg = format!("[socat] PID {pid} exited immediately — {detail}");
-            eprintln!("{msg}");
+            let msg = format!("PID {pid} exited immediately — {detail}");
+            tracing::error!(pid = pid, exit_status = %status, stderr = %stderr_output, "socat exited immediately");
             Err(msg)
         }
-        Ok(_) => {
-            println!("[socat] PID {pid} is alive and listening on :{local_port}");
+        Ok(None) => {
+            tracing::debug!(pid = pid, "socat process verified alive and active");
 
             tokio::spawn(async move {
+                tracing::trace!(pid = pid, "Monitoring socat process wait status");
                 match child.wait().await {
-                    Ok(status) => eprintln!("[socat] PID {pid} exited with {status}"),
-                    Err(e) => eprintln!("[socat] PID {pid} wait error: {e}"),
+                    Ok(status) => {
+                        if status.success() {
+                            tracing::debug!(pid = pid, exit_status = %status, "socat process exited cleanly");
+                        } else {
+                            tracing::error!(pid = pid, exit_status = %status, "socat process exited with error");
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!(pid = pid, error = %e, "Error waiting for socat process")
+                    }
                 }
             });
 
             Ok(pid)
         }
         Err(e) => {
+            tracing::error!(pid = pid, error = %e, "Failed to try_wait socat process; killing it");
             let _ = Command::new("kill")
                 .arg("-9")
                 .arg(format!("-{}", pid))
                 .output()
                 .await;
-            let msg = format!("[socat] Failed to check PID {pid} status: {e}");
-            eprintln!("{msg}");
+            let msg = format!("Failed to check PID {pid} status: {e}");
             Err(msg)
         }
     }
 }
 
-/// Kill a socat process by PID using `kill -9`.
 /// Kill a socat process AND all its children by targeting the Process Group (PGID).
 pub async fn kill_socat(pid: u32) -> Result<(), String> {
-    println!("[socat] Killing Process Group for PID {pid}");
+    tracing::debug!(pid = pid, "Attempting to kill process group");
 
     let status = tokio::process::Command::new("sh")
         .arg("-c")
@@ -99,15 +120,15 @@ pub async fn kill_socat(pid: u32) -> Result<(), String> {
         .status()
         .await
         .map_err(|e| {
-            let msg = format!("[socat] Failed to execute shell kill for PGID {pid}: {e}");
-            eprintln!("{msg}");
+            let msg = format!("Failed to execute shell kill for PGID {pid}: {e}");
+            tracing::error!(pid = pid, error = %e, "Failed to execute kill command");
             msg
         })?;
 
     if status.success() {
-        println!("[socat] Process group {pid} killed successfully");
+        tracing::debug!(pid = pid, "Process group killed successfully");
     } else {
-        eprintln!("[socat] kill command exited with {status} for PGID {pid} (may already be dead)");
+        tracing::warn!(pid = pid, exit_status = %status, "kill command completed with non-zero status");
     }
 
     Ok(())
@@ -122,18 +143,29 @@ pub async fn restore_tunnels(state: &SharedState) {
     let mut restored = 0u32;
     let mut failed = 0u32;
 
-    println!("[boot] Restoring {total} tunnel(s)...");
+    tracing::info!(total = total, "Restoring active tunnels on startup");
 
     for tunnel in tunnels.iter_mut() {
         if !tunnel.enabled {
+            tracing::debug!(
+                name = %tunnel.name,
+                local_port = tunnel.local_port,
+                "Tunnel is disabled; skipping"
+            );
             tunnel.pid = None;
             continue;
         }
 
+        tracing::trace!(
+            name = %tunnel.name,
+            local_port = tunnel.local_port,
+            "Checking system port availability"
+        );
         if !is_port_available(tunnel.local_port).await {
-            eprintln!(
-                "[boot] Port {} is already in use — disabling tunnel '{}'",
-                tunnel.local_port, tunnel.name
+            tracing::warn!(
+                name = %tunnel.name,
+                local_port = tunnel.local_port,
+                "Port is already in use; disabling tunnel"
             );
             tunnel.enabled = false;
             tunnel.pid = None;
@@ -141,19 +173,27 @@ pub async fn restore_tunnels(state: &SharedState) {
             continue;
         }
 
+        tracing::debug!(
+            name = %tunnel.name,
+            local_port = tunnel.local_port,
+            target = %format!("{}:{}", tunnel.target_host, tunnel.target_port),
+            "Spawning socat process for tunnel"
+        );
         match spawn_socat(tunnel.local_port, &tunnel.target_host, tunnel.target_port).await {
             Ok(pid) => {
-                println!(
-                    "[boot] Restored '{}' (:{} -> {}:{}) PID {pid}",
-                    tunnel.name, tunnel.local_port, tunnel.target_host, tunnel.target_port
+                tracing::debug!(
+                    name = %tunnel.name,
+                    pid = pid,
+                    "Tunnel successfully restored"
                 );
                 tunnel.pid = Some(pid);
                 restored += 1;
             }
             Err(e) => {
-                eprintln!(
-                    "[boot] Failed to restore '{}': {e} — marking as disabled",
-                    tunnel.name
+                tracing::warn!(
+                    name = %tunnel.name,
+                    error = %e,
+                    "Failed to restore tunnel; marking as disabled"
                 );
                 tunnel.enabled = false;
                 tunnel.pid = None;
@@ -162,16 +202,19 @@ pub async fn restore_tunnels(state: &SharedState) {
         }
     }
 
-    println!(
-        "[boot] Restore complete: {restored} active, {failed} failed, {} skipped",
-        total as u32 - restored - failed
+    tracing::info!(
+        restored = restored,
+        failed = failed,
+        skipped = (total as u32 - restored - failed),
+        "Boot-time tunnel restoration complete"
     );
 
     // Persist updated state (disabled tunnels that failed to restore).
     if failed > 0 {
         let tunnels_slice: &[Tunnel] = &tunnels;
+        tracing::debug!("Persisting updated tunnel configurations after failures");
         if let Err(e) = save_tunnels(tunnels_slice).await {
-            eprintln!("[boot] Failed to persist updated state after restore: {e}");
+            tracing::error!(error = %e, "Failed to persist updated state after restore");
         }
     }
 }
