@@ -13,8 +13,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     iptables \
     iproute2 \
-    socat \
-    netcat-openbsd \
     jq \
     unzip \
     && rm -rf /var/lib/apt/lists/*
