@@ -1,4 +1,6 @@
 const API = "/api";
+const GITHUB_REPO_API = "https://api.github.com/repos/jackskelt/tailscale-discloud";
+const GITHUB_REPO_URL = "https://github.com/jackskelt/tailscale-discloud";
 
 // ─── State ───────────────────────────────────────────────────────────────
 let tunnels = [];
@@ -32,6 +34,18 @@ const dom = {
   inputEnabled: $("input-enabled"),
   formSubmitBtn: $("form-submit-btn"),
   formCancelBtn: $("form-cancel-btn"),
+
+  // Visualization
+  vizClientStatus: $("viz-client-status"),
+  vizConnTailscalePort: $("viz-conn-tailscale-port"),
+  vizGatewayPort: $("viz-gateway-port"),
+  vizConnVlanAddress: $("viz-conn-vlan-address"),
+  vizTargetName: $("viz-target-name"),
+  vizTargetHost: $("viz-target-host"),
+  vizTargetPort: $("viz-target-port"),
+  vlanVizContainer: $("vlan-viz-container"),
+  vlanVizHeader: $("vlan-viz-header"),
+  vlanVizToggle: $("vlan-viz-toggle"),
 
   // Suggestions
   suggestionsSection: $("suggestions-section"),
@@ -76,6 +90,7 @@ const dom = {
 
   // Version
   appVersion: $("app-version"),
+  updateBadge: $("update-badge"),
 
   // Node info
   nodeInfoBtn: $("node-info-btn"),
@@ -92,6 +107,14 @@ const dom = {
   connectionDone: $("connection-done"),
   connectionTitle: $("connection-title"),
   connectionGrid: $("connection-grid"),
+
+  // Update modal
+  updateOverlay: $("update-overlay"),
+  updateClose: $("update-close"),
+  updateCurrentVal: $("update-current-val"),
+  updateLatestVal: $("update-latest-val"),
+  updateBtnRepo: $("update-btn-repo"),
+  updateBtnRelease: $("update-btn-release"),
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -105,6 +128,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   bindEvents();
   bindNodeInfoEvents();
   bindConnectionEvents();
+  bindUpdateEvents();
   loadConfig();
 
   loadSuggestions();
@@ -260,6 +284,7 @@ function applyI18n() {
   if (suggestions.length > 0) {
     renderSuggestions();
   }
+  updateVisualization();
 }
 
 function renderLangDropdown() {
@@ -308,6 +333,26 @@ function closeLangDropdown() {
 function bindEvents() {
   dom.tunnelForm.addEventListener("submit", onCreateSubmit);
   dom.formCancelBtn.addEventListener("click", resetCreateForm);
+
+  dom.inputLocalPort.addEventListener("input", updateVisualization);
+  dom.inputTargetHost.addEventListener("input", updateVisualization);
+  dom.inputTargetPort.addEventListener("input", updateVisualization);
+  dom.inputName.addEventListener("input", updateVisualization);
+
+  // Toggle flow preview collapse
+  const vizHeader = dom.vlanVizHeader;
+  const vizContainer = dom.vlanVizContainer;
+  if (vizHeader && vizContainer) {
+    const collapsed = localStorage.getItem("vizCollapsed") === "true";
+    if (collapsed) {
+      vizContainer.classList.add("collapsed");
+    }
+
+    vizHeader.addEventListener("click", () => {
+      vizContainer.classList.toggle("collapsed");
+      localStorage.setItem("vizCollapsed", vizContainer.classList.contains("collapsed"));
+    });
+  }
 
   dom.refreshBtn.addEventListener("click", () => {
     loadConfig();
@@ -392,6 +437,54 @@ async function api(path, opts = {}) {
 // Data Loading
 // ═══════════════════════════════════════════════════════════════════════════
 
+function isNewerVersion(current, latest) {
+  if (!current || !latest) return false;
+  const cClean = current.replace(/^[vV]/, "").split("-")[0];
+  const lClean = latest.replace(/^[vV]/, "").split("-")[0];
+  const cParts = cClean.split(".").map(Number);
+  const lParts = lClean.split(".").map(Number);
+  const maxLen = Math.max(cParts.length, lParts.length);
+  for (let i = 0; i < maxLen; i++) {
+    const c = cParts[i] || 0;
+    const l = lParts[i] || 0;
+    if (l > c) return true;
+    if (c > l) return false;
+  }
+  return false;
+}
+
+async function checkForUpdates(currentVersion) {
+  if (!dom.updateBadge) return;
+  try {
+    const res = await fetch(`${GITHUB_REPO_API}/releases/latest`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const latest = data.tag_name;
+    if (!latest) return;
+
+    if (isNewerVersion(currentVersion, latest)) {
+      const releaseUrl = data.html_url || `${GITHUB_REPO_URL}/releases/latest`;
+      
+      if (dom.updateCurrentVal) {
+        dom.updateCurrentVal.textContent = `v${currentVersion}`;
+      }
+      if (dom.updateLatestVal) {
+        dom.updateLatestVal.textContent = latest;
+      }
+      if (dom.updateBtnRepo) {
+        dom.updateBtnRepo.href = GITHUB_REPO_URL;
+      }
+      if (dom.updateBtnRelease) {
+        dom.updateBtnRelease.href = releaseUrl;
+      }
+      
+      dom.updateBadge.style.display = "inline-flex";
+    }
+  } catch (err) {
+    console.warn("[update] Failed to check for updates:", err);
+  }
+}
+
 async function loadConfig() {
   try {
     const cfg = await api("/config");
@@ -404,6 +497,7 @@ async function loadConfig() {
     updateNodeInfo();
     if (cfg && cfg.version && dom.appVersion) {
       dom.appVersion.textContent = `v${cfg.version}`;
+      checkForUpdates(cfg.version);
     }
   } catch (err) {
     console.warn("[config] Could not load config:", err);
@@ -511,6 +605,7 @@ function resetCreateForm() {
   if (btnSpan) {
     btnSpan.textContent = t("form.btn.create");
   }
+  updateVisualization();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -758,6 +853,38 @@ function applySuggestion(index) {
 
   toast(t("toast.suggestion.applied", { name: s.name }), "info");
   dom.tunnelForm.scrollIntoView({ behavior: "smooth", block: "center" });
+  updateVisualization();
+}
+
+function updateVisualization() {
+  const localPort = dom.inputLocalPort.value || "5432";
+  const targetHost = dom.inputTargetHost.value.trim() || "target-app";
+  const targetPort = dom.inputTargetPort.value || "5432";
+  const name = dom.inputName.value.trim() || t("viz.target.name_default");
+
+  const host = getPreferredNodeHost() || "tailscale-node";
+
+  if (dom.vizClientStatus) {
+    dom.vizClientStatus.textContent = t("viz.client.status");
+  }
+  if (dom.vizConnTailscalePort) {
+    dom.vizConnTailscalePort.textContent = `${host}:${localPort}`;
+  }
+  if (dom.vizGatewayPort) {
+    dom.vizGatewayPort.textContent = t("viz.gateway.listening", { port: localPort });
+  }
+  if (dom.vizConnVlanAddress) {
+    dom.vizConnVlanAddress.textContent = `${targetHost}:${targetPort}`;
+  }
+  if (dom.vizTargetName) {
+    dom.vizTargetName.textContent = name;
+  }
+  if (dom.vizTargetHost) {
+    dom.vizTargetHost.textContent = targetHost;
+  }
+  if (dom.vizTargetPort) {
+    dom.vizTargetPort.textContent = `:${targetPort}`;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -843,6 +970,7 @@ function updateNodeInfo() {
   if (tunnels.length > 0) {
     renderTunnels();
   }
+  updateVisualization();
 }
 
 function renderNodeInfoModal() {
@@ -926,6 +1054,27 @@ function bindConnectionEvents() {
   }
 }
 
+function bindUpdateEvents() {
+  if (dom.updateBadge) {
+    dom.updateBadge.addEventListener("click", (e) => {
+      e.preventDefault();
+      openOverlay(dom.updateOverlay);
+    });
+  }
+  if (dom.updateClose) {
+    dom.updateClose.addEventListener("click", () => {
+      closeOverlay(dom.updateOverlay);
+    });
+  }
+  if (dom.updateOverlay) {
+    dom.updateOverlay.addEventListener("click", (e) => {
+      if (e.target === dom.updateOverlay) {
+        closeOverlay(dom.updateOverlay);
+      }
+    });
+  }
+}
+
 function openConnectionModal(tunnelId) {
   const tunnel = tunnels.find((t) => t.id === tunnelId);
   if (!tunnel) return;
@@ -948,15 +1097,15 @@ function openConnectionModal(tunnelId) {
   if (dom.connectionGrid) {
     dom.connectionGrid.innerHTML = options.length
       ? options
-          .map(
-            (item) => `
+        .map(
+          (item) => `
         <button class="copy-row" data-copy-value="${escAttr(item.value)}" type="button">
           <span class="copy-row-label">${esc(item.label)}</span>
           <span class="copy-row-value">${esc(item.value)}</span>
         </button>
       `,
-          )
-          .join("")
+        )
+        .join("")
       : `<div class="text-muted">No addresses available</div>`;
   }
 

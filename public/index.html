@@ -30,10 +30,21 @@
                             >
                                 Manage TCP tunnels via Tailscale
                             </p>
-                            <span
-                                id="app-version"
-                                class="header-version"
-                            ></span>
+                            <div class="version-wrapper">
+                                <span
+                                    id="app-version"
+                                    class="header-version"
+                                ></span>
+                                <a
+                                    id="update-badge"
+                                    href="#"
+                                    class="update-badge discreet"
+                                    style="display: none;"
+                                    data-i18n-title="update.title"
+                                >
+                                    <span class="update-badge-dot"></span>
+                                </a>
+                            </div>
                         </div>
                         <div class="header-node-info">
                             <button
@@ -383,6 +394,81 @@
                                 </button>
                             </div>
                         </form>
+
+                        <!-- VLAN & Tunnel Flow Visualization -->
+                        <div class="vlan-viz-container" id="vlan-viz-container">
+                            <div class="vlan-viz-header" id="vlan-viz-header" style="cursor: pointer;">
+                                <h3 class="vlan-viz-title">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
+                                    <span data-i18n="viz.title">VLAN & Tunnel Flow Preview</span>
+                                </h3>
+                                <div class="vlan-viz-header-right" style="display: flex; align-items: center; gap: var(--space-sm);">
+                                    <span class="vlan-viz-badge" data-i18n="viz.badge">VLAN Private Network</span>
+                                    <button class="btn btn-ghost btn-icon btn-sm" id="vlan-viz-toggle" type="button" data-i18n-title="viz.toggle.title" title="Toggle flow preview" style="width: 24px; height: 24px; padding: 0; border-radius: var(--radius-sm);">
+                                        <svg class="chevron-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition: transform var(--transition-base); transform: rotate(0deg);"><polyline points="6 9 12 15 18 9"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="vlan-viz-body" id="vlan-viz-body">
+                                <!-- Your Computer (Client) -->
+                                <div class="viz-node viz-node-client">
+                                    <div class="viz-icon-wrapper">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                    </div>
+                                    <div class="viz-node-name" data-i18n="viz.client.name">Your Computer</div>
+                                    <div class="viz-node-desc" data-i18n="viz.client.desc">Tailscale Client</div>
+                                    <div class="viz-node-port text-green" id="viz-client-status" data-i18n="viz.client.status">Connected</div>
+                                </div>
+
+                                <!-- Connector: Tailscale -->
+                                <div class="viz-connector-wrapper">
+                                    <div class="viz-connector viz-conn-tailscale">
+                                        <div class="viz-pulse-dot"></div>
+                                    </div>
+                                    <div class="viz-connector-text">
+                                        <div class="viz-connector-label" data-i18n="viz.connector.vpn">Tailscale VPN</div>
+                                        <div class="viz-connector-sub" id="viz-conn-tailscale-port">node-ip:local-port</div>
+                                    </div>
+                                </div>
+
+                                <!-- Discloud Cluster Boundary -->
+                                <div class="viz-cluster">
+                                    <div class="viz-cluster-label">Discloud Cluster</div>
+                                    <div class="viz-cluster-content">
+                                        <!-- Gateway (Tailscale Node inside Discloud) -->
+                                        <div class="viz-node viz-node-gateway">
+                                            <div class="viz-icon-wrapper">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/></svg>
+                                            </div>
+                                            <div class="viz-node-name" data-i18n="viz.gateway.name">Tailscale Node</div>
+                                            <div class="viz-node-desc" data-i18n="viz.gateway.desc">Gateway Container</div>
+                                            <div class="viz-node-port text-green" id="viz-gateway-port">Listening :local-port</div>
+                                        </div>
+
+                                        <!-- Connector: VLAN -->
+                                        <div class="viz-connector-wrapper">
+                                            <div class="viz-connector viz-conn-vlan">
+                                                <div class="viz-pulse-dot"></div>
+                                            </div>
+                                            <div class="viz-connector-text">
+                                                <div class="viz-connector-label" data-i18n="viz.connector.vlan">Discloud VLAN</div>
+                                                <div class="viz-connector-sub" id="viz-conn-vlan-address">target-host:target-port</div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Target App Container -->
+                                        <div class="viz-node viz-node-target">
+                                            <div class="viz-icon-wrapper">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
+                                            </div>
+                                            <div class="viz-node-name" id="viz-target-name" data-i18n="viz.target.name_default">Target App</div>
+                                            <div class="viz-node-desc" id="viz-target-host">target-host</div>
+                                            <div class="viz-node-port text-primary" id="viz-target-port">:target-port</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -796,6 +882,86 @@
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══ Update Details Modal ═══ -->
+            <div class="modal-overlay" id="update-overlay">
+                <div class="modal">
+                    <div class="modal-header">
+                        <h3 class="modal-title">
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <circle cx="12" cy="12" r="10" />
+                                <path d="M12 16v-4" />
+                                <path d="M12 8h.01" />
+                            </svg>
+                            <span data-i18n="update.modal.title">New Update Available</span>
+                        </h3>
+                        <button
+                            class="btn btn-ghost btn-icon"
+                            id="update-close"
+                            title="Close"
+                            data-i18n-title="update.modal.close"
+                        >
+                            <svg
+                                width="18"
+                                height="18"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                            >
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="update-modal-text" data-i18n="update.modal.text">A new version of Tailscale Tunnel Manager is available. We recommend updating to stay up to date with the latest features and security improvements.</p>
+                        <div class="update-info-comparison">
+                            <div class="update-info-version">
+                                <span class="update-info-label" data-i18n="update.modal.current">Current Version</span>
+                                <span class="update-info-val" id="update-current-val">-</span>
+                            </div>
+                            <div class="update-info-arrow">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="5" y1="12" x2="19" y2="12" />
+                                    <polyline points="12 5 19 12 12 19" />
+                                </svg>
+                            </div>
+                            <div class="update-info-version">
+                                <span class="update-info-label" data-i18n="update.modal.latest">Latest Version</span>
+                                <span class="update-info-val highlight" id="update-latest-val">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="display: flex; gap: var(--space-sm); justify-content: flex-end;">
+                        <a class="btn btn-ghost" id="update-btn-repo" href="#" target="_blank" rel="noopener noreferrer">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;">
+                                <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
+                            </svg>
+                            <span data-i18n="update.modal.repo">GitHub Repository</span>
+                        </a>
+                        <a class="btn btn-primary" id="update-btn-release" href="#" target="_blank" rel="noopener noreferrer">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px;">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                <polyline points="15 3 21 3 21 9" />
+                                <line x1="10" y1="14" x2="21" y2="3" />
+                            </svg>
+                            <span data-i18n="update.modal.release">View Release</span>
+                        </a>
                     </div>
                 </div>
             </div>
