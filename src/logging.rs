@@ -2,12 +2,16 @@ use crate::tailscale::localapi::LocalNodeInfo;
 use tracing_appender::rolling::{RollingFileAppender, Rotation};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-pub fn init_logging() -> tracing_appender::non_blocking::WorkerGuard {
+pub fn init_logging() -> (
+    tracing_appender::non_blocking::WorkerGuard,
+    tracing_appender::non_blocking::WorkerGuard,
+) {
+    // API log file appender
     let file_appender = match RollingFileAppender::builder()
         .rotation(Rotation::DAILY)
         .max_log_files(5)
         .filename_prefix("tailscale-discloud")
-        .filename_suffix(".log")
+        .filename_suffix("log")
         .build("./logs")
     {
         Ok(appender) => appender,
@@ -17,7 +21,23 @@ pub fn init_logging() -> tracing_appender::non_blocking::WorkerGuard {
         }
     };
 
+    // Tailscaled log file appender (separate file)
+    let tailscaled_appender = match RollingFileAppender::builder()
+        .rotation(Rotation::DAILY)
+        .max_log_files(5)
+        .filename_prefix("tailscaled")
+        .filename_suffix("log")
+        .build("./logs")
+    {
+        Ok(appender) => appender,
+        Err(e) => {
+            tracing::error!("Failed to create tailscaled log file appender: {}", e);
+            panic!("Failed to create tailscaled log file appender");
+        }
+    };
+
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+    let (ts_non_blocking, ts_guard) = tracing_appender::non_blocking(tailscaled_appender);
 
     let rust_log = std::env::var("RUST_LOG").unwrap_or_default();
     let filter_str = if rust_log.is_empty() {
@@ -34,27 +54,45 @@ pub fn init_logging() -> tracing_appender::non_blocking::WorkerGuard {
     };
     let env_filter = EnvFilter::new(filter_str);
 
+    // Console: show everything except tailscaled output
     let stdout_layer = fmt::layer()
         .with_thread_ids(false)
         .with_thread_names(false)
         .with_target(true)
-        .with_ansi(true);
+        .with_ansi(true)
+        .with_filter(tracing_subscriber::filter::filter_fn(|metadata| {
+            metadata.target() != "tailscaled"
+        }));
 
+    // API file layer: exclude tailscaled logs
     let file_layer = fmt::layer()
         .with_writer(non_blocking)
         .with_ansi(false)
-        .with_target(true);
+        .with_target(true)
+        .with_filter(tracing_subscriber::filter::filter_fn(|metadata| {
+            metadata.target() != "tailscaled"
+        }));
+
+    // Tailscaled file layer: only tailscaled logs
+    let tailscaled_file_layer = fmt::layer()
+        .with_writer(ts_non_blocking)
+        .with_ansi(false)
+        .with_target(true)
+        .with_filter(tracing_subscriber::filter::filter_fn(|metadata| {
+            metadata.target() == "tailscaled"
+        }));
 
     tracing_subscriber::registry()
         .with(env_filter)
         .with(stdout_layer)
         .with(file_layer)
+        .with(tailscaled_file_layer)
         .init();
 
-    guard
+    (guard, ts_guard)
 }
 
-fn clickable_terminal_link(url: &str) -> String {
+pub fn clickable_terminal_link(url: &str) -> String {
     // For terminals that support OSC 8 hyperlinks (most Unix terminals), format the URL as a clickable link.
     format!("\x1b]8;;{url}\x1b\\{url}\x1b]8;;\x1b\\")
 }
@@ -88,6 +126,32 @@ fn visible_len(s: &str) -> usize {
     len
 }
 
+/// Print a list of lines inside a colored terminal box with Unicode borders.
+pub fn print_box(lines: &[String]) {
+    let max_len = lines.iter().map(|l| visible_len(l)).max().unwrap_or(0);
+    let border_width = max_len + 4;
+
+    let mut output = String::new();
+    output.push_str("\n\x1b[96m┌");
+    output.push_str(&"─".repeat(border_width - 2));
+    output.push_str("┐\x1b[0m\n");
+
+    for line in lines {
+        let actual_visible = visible_len(line);
+        let padding = border_width - actual_visible - 4;
+        output.push_str("\x1b[96m│\x1b[0m ");
+        output.push_str(line);
+        output.push_str(&" ".repeat(padding));
+        output.push_str(" \x1b[96m│\x1b[0m\n");
+    }
+
+    output.push_str("\x1b[96m└");
+    output.push_str(&"─".repeat(border_width - 2));
+    output.push_str("┘\x1b[0m\n");
+
+    println!("{output}");
+}
+
 pub fn print_node_box(config: &LocalNodeInfo) {
     let mut lines = Vec::new();
     lines.push("You can connect to this node using:".to_string());
@@ -117,26 +181,5 @@ pub fn print_node_box(config: &LocalNodeInfo) {
         ));
     }
 
-    let max_len = lines.iter().map(|l| visible_len(l)).max().unwrap_or(0);
-    let border_width = max_len + 4;
-
-    let mut output = String::new();
-    output.push_str("\n\x1b[96m┌");
-    output.push_str(&"─".repeat(border_width - 2));
-    output.push_str("┐\x1b[0m\n");
-
-    for line in lines {
-        let actual_visible = visible_len(&line);
-        let padding = border_width - actual_visible - 4;
-        output.push_str("\x1b[96m│\x1b[0m ");
-        output.push_str(&line);
-        output.push_str(&" ".repeat(padding));
-        output.push_str(" \x1b[96m│\x1b[0m\n");
-    }
-
-    output.push_str("\x1b[96m└");
-    output.push_str(&"─".repeat(border_width - 2));
-    output.push_str("┘\x1b[0m\n");
-
-    println!("{output}");
+    print_box(&lines);
 }

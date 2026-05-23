@@ -12,8 +12,24 @@ use tailscale_tunnel_manager::tailscale::localapi::get_local_node_info;
 
 #[tokio::main]
 async fn main() {
-    let _guard = tailscale_tunnel_manager::logging::init_logging();
+    let _log_guards = tailscale_tunnel_manager::logging::init_logging();
 
+    let args: Vec<String> = std::env::args().collect();
+    let is_prod = args.contains(&"--prod".to_string())
+        || std::env::var("PRODUCTION").unwrap_or_default() == "true";
+
+    let _tailscaled_child = if is_prod {
+        tracing::info!("Initializing Tailscale processes...");
+        match tailscale_tunnel_manager::tailscale::process::init_tailscale_flow().await {
+            Ok(child) => Some(child),
+            Err(e) => {
+                tracing::error!("Failed to initialize Tailscale: {}", e);
+                std::process::exit(1);
+            }
+        }
+    } else {
+        None
+    };
     tracing::info!(target: "tailscale_tunnel_manager", "Tailscale Tunnel Manager starting...");
 
     // Load persisted tunnels from disk
@@ -36,7 +52,11 @@ async fn main() {
             tailscale_tunnel_manager::logging::print_node_box(&config);
         }
         Err(e) => {
-            tracing::error!(target: "tailscale_tunnel_manager", "Failed to read LocalAPI node info: {}", e)
+            if is_prod {
+                tracing::error!(target: "tailscale_tunnel_manager", "Failed to read LocalAPI node info: {}", e);
+            } else {
+                tracing::error!(target: "tailscale_tunnel_manager", "Local Tailscale socket not accessible in development mode: {}", e);
+            }
         }
     }
 
