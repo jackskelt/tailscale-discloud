@@ -18,7 +18,9 @@ pub struct ConfigResponse {
     pub version: String,
 }
 
+#[tracing::instrument]
 pub async fn get_config() -> Json<ConfigResponse> {
+    tracing::debug!("GET /api/config");
     let version = env!("CARGO_PKG_VERSION").to_string();
 
     let (magicdns_hostname, dns_name, ipv4, ipv6) = match get_local_node_info().await {

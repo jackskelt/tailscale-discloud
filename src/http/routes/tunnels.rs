@@ -7,7 +7,10 @@ use axum::{
 };
 use uuid::Uuid;
 
-use crate::http::errors::{ApiErrorResponse, ApiMessage};
+use crate::{
+    http::errors::{ApiErrorResponse, ApiMessage},
+    tunnels::service::TunnelSpawnError,
+};
 
 use crate::net::reachability::{check_target_reachability, ReachabilityResult};
 
@@ -61,7 +64,9 @@ type ApiResult<T> = Result<T, (StatusCode, Json<ApiErrorResponse>)>;
 
 // ─── GET /api/tunnels ────────────────────────────────────────────────────
 
+#[tracing::instrument(skip(state))]
 pub async fn list_tunnels(State(state): State<SharedState>) -> Json<Vec<TunnelListItem>> {
+    tracing::debug!("GET /api/tunnels");
     let tunnels = state.read().await;
     tracing::debug!("Returning {} tunnel(s)", tunnels.len());
 
@@ -75,17 +80,18 @@ pub async fn list_tunnels(State(state): State<SharedState>) -> Json<Vec<TunnelLi
 
 // ─── POST /api/tunnels ───────────────────────────────────────────────────
 
+#[tracing::instrument(skip(state, payload))]
 pub async fn create_tunnel(
     State(state): State<SharedState>,
     Json(payload): Json<CreateTunnelRequest>,
 ) -> ApiResult<(StatusCode, Json<TunnelResponse>)> {
-    tracing::info!(
-        name = payload.name,
+    tracing::debug!(
+        name = %payload.name,
         local_port = payload.local_port,
-        target_host = payload.target_host,
+        target_host = %payload.target_host,
         target_port = payload.target_port,
         enabled = payload.enabled,
-        "Create Tunnel",
+        "POST /api/tunnels"
     );
 
     // ── Validation ──────────────────────────────────────────────────────
@@ -264,17 +270,28 @@ pub async fn create_tunnel(
 
 // ─── PUT /api/tunnels/:id ────────────────────────────────────────────────
 
+#[tracing::instrument(skip(state, payload), fields(
+    id = %id,
+))]
 pub async fn update_tunnel(
     State(state): State<SharedState>,
     Path(id): Path<String>,
     Json(payload): Json<UpdateTunnelRequest>,
 ) -> ApiResult<Json<TunnelResponse>> {
-    tracing::debug!("payload: {payload:?}");
+    tracing::debug!(
+        id = %id,
+        name = ?payload.name,
+        local_port = ?payload.local_port,
+        target_host = ?payload.target_host,
+        target_port = ?payload.target_port,
+        enabled = ?payload.enabled,
+        "PUT /api/tunnels/{id}"
+    );
 
     let mut tunnels = state.write().await;
 
     let index = tunnels.iter().position(|t| t.id == id).ok_or_else(|| {
-        tracing::error!("Not found");
+        tracing::debug!("Not found");
         (
             StatusCode::NOT_FOUND,
             Json(api_err_params(
@@ -332,7 +349,7 @@ pub async fn update_tunnel(
 
     // ── Self-loop detection ─────────────────────────────────────────────
     if new_local_port == new_target_port && is_loopback_host(&new_target_host) {
-        tracing::error!(
+        tracing::debug!(
             "Rejected: self-loop (localhost:{} -> localhost:{})",
             new_local_port,
             new_target_port
@@ -413,11 +430,11 @@ pub async fn update_tunnel(
             Err(e) => {
                 tracing::error!("tunnel failed: {e}");
                 let (status, err_body) = match e {
-                    crate::tunnels::service::TunnelSpawnError::AddrInUse(port) => (
+                    TunnelSpawnError::AddrInUse(port) => (
                         StatusCode::CONFLICT,
                         api_err_params("api.error.port_in_use", params1("port", port)),
                     ),
-                    crate::tunnels::service::TunnelSpawnError::Other(detail) => (
+                    TunnelSpawnError::Other(detail) => (
                         StatusCode::INTERNAL_SERVER_ERROR,
                         api_err_params("api.error.tunnel_failed", params1("detail", detail)),
                     ),
@@ -468,16 +485,17 @@ pub async fn update_tunnel(
 
 // ─── DELETE /api/tunnels/:id ─────────────────────────────────────────────
 
+#[tracing::instrument(skip(state), fields(id = %id))]
 pub async fn delete_tunnel(
     State(state): State<SharedState>,
     Path(id): Path<String>,
 ) -> ApiResult<StatusCode> {
-    tracing::info!("DELETE /api/tunnels/{}", id);
+    tracing::debug!(id = %id, "DELETE /api/tunnels/{id}");
 
     let mut tunnels = state.write().await;
 
     let index = tunnels.iter().position(|t| t.id == id).ok_or_else(|| {
-        tracing::error!("Not found");
+        tracing::debug!("Not found");
         (
             StatusCode::NOT_FOUND,
             Json(api_err_params(
@@ -505,7 +523,7 @@ pub async fn delete_tunnel(
         tracing::error!("Persistence failed: {e}");
     }
 
-    tracing::debug!("Deleted tunnel '{}'", name);
+    tracing::info!("Deleted tunnel '{}' id={}", name, id);
 
     Ok(StatusCode::NO_CONTENT)
 }
