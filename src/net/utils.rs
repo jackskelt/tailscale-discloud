@@ -1,6 +1,4 @@
-use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
-use tokio::process::Command;
 
 /// Returns `true` when `host` resolves to a loopback address (localhost,
 /// 127.x.x.x, ::1, 0.0.0.0). Used to detect self-loop configurations.
@@ -30,76 +28,48 @@ pub async fn is_port_available(port: u16) -> bool {
     is_avail
 }
 
-/// Test connectivity to a host:port using `nc -zvw3`.
+/// Test connectivity to a host:port.
 /// Returns `(success, combined_log)`.
 pub async fn test_connection(target_host: &str, target_port: u16) -> (bool, String) {
     tracing::debug!(
         target_host = %target_host,
         target_port = target_port,
-        "Running netcat connection test"
+        "Running connection test"
     );
 
-    let result = Command::new("nc")
-        .arg("-zvw3")
-        .arg(target_host)
-        .arg(target_port.to_string())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn();
-
-    match result {
-        Ok(mut child) => {
-            let mut stdout_buf = String::new();
-            let mut stderr_buf = String::new();
-
-            if let Some(ref mut stdout) = child.stdout {
-                let _ = stdout.read_to_string(&mut stdout_buf).await;
-            }
-            if let Some(ref mut stderr) = child.stderr {
-                let _ = stderr.read_to_string(&mut stderr_buf).await;
-            }
-
-            let status = child.wait().await;
-            let success = status.map(|s| s.success()).unwrap_or(false);
-
-            let mut log = String::new();
-            if !stdout_buf.is_empty() {
-                log.push_str(&stdout_buf);
-            }
-            if !stderr_buf.is_empty() {
-                if !log.is_empty() {
-                    log.push('\n');
-                }
-                log.push_str(&stderr_buf);
-            }
-            if log.is_empty() {
-                log = if success {
-                    "Connection succeeded".to_string()
-                } else {
-                    format!("Connection to {target_host}:{target_port} failed (no output)")
-                };
-            }
-
-            if success {
-                tracing::debug!(
-                    target_host = %target_host,
-                    target_port = target_port,
-                    "Connection test succeeded"
-                );
-            } else {
-                tracing::debug!(
-                    target_host = %target_host,
-                    target_port = target_port,
-                    log = %log,
-                    "Connection test failed"
-                );
-            }
-
-            (success, log)
+    let addr = format!("{target_host}:{target_port}");
+    match tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        tokio::net::TcpStream::connect(&addr),
+    )
+    .await
+    {
+        Ok(Ok(_stream)) => {
+            tracing::debug!(
+                target_host = %target_host,
+                target_port = target_port,
+                "Connection test succeeded"
+            );
+            (true, "Connection succeeded".to_string())
         }
-        Err(e) => {
-            let msg = format!("Failed to run nc: {e}");
-            tracing::error!(error = %e, "Failed to execute nc subprocess");
+        Ok(Err(e)) => {
+            let msg = format!("Connection to {target_host}:{target_port} failed: {e}");
+            tracing::debug!(
+                target_host = %target_host,
+                target_port = target_port,
+                log = %msg,
+                "Connection test failed"
+            );
+            (false, msg)
+        }
+        Err(_) => {
+            let msg = format!("Connection to {target_host}:{target_port} failed: connection timed out after 3 seconds");
+            tracing::debug!(
+                target_host = %target_host,
+                target_port = target_port,
+                log = %msg,
+                "Connection test failed"
+            );
             (false, msg)
         }
     }

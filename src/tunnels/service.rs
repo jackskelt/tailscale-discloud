@@ -1,141 +1,185 @@
-use tokio::io::AsyncReadExt;
-use tokio::process::Command;
+use std::collections::HashMap;
+use std::sync::OnceLock;
+use tokio::net::TcpListener;
+use tokio::sync::oneshot;
 
 use crate::net::utils::is_port_available;
 use crate::storage::tunnels_json::save_tunnels;
 use crate::tunnels::{SharedState, Tunnel};
 
-/// Spawn a `socat` process that forwards `local_port` -> `target_host:target_port`.
-///
-/// After spawning, waits briefly and verifies the process is still alive.
-/// If socat exits immediately (bad args, port conflict, etc.) the stderr
-/// output is captured and returned as an error — no zombie / orphan is left.
-pub async fn spawn_socat(
-    local_port: u16,
-    target_host: &str,
-    target_port: u16,
-) -> Result<u32, String> {
-    let listen_arg = format!("TCP-LISTEN:{local_port},fork,reuseaddr");
-    let connect_arg = format!("TCP:{target_host}:{target_port}");
+#[derive(Debug)]
+pub enum TunnelSpawnError {
+    AddrInUse(u16),
+    Other(String),
+}
 
-    tracing::debug!(
-        local_port = local_port,
-        target = %format!("{target_host}:{target_port}"),
-        listen = %listen_arg,
-        connect = %connect_arg,
-        "Prepared command arguments for socat"
-    );
-
-    use std::os::unix::process::CommandExt;
-
-    let mut std_cmd = std::process::Command::new("socat");
-    std_cmd.process_group(0);
-
-    tracing::trace!("Spawning socat process in new process group");
-    let mut child = Command::from(std_cmd)
-        .arg(&listen_arg)
-        .arg(&connect_arg)
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::piped())
-        .kill_on_drop(false)
-        .spawn()
-        .map_err(|e| {
-            let msg = format!("Failed to spawn socat: {e}");
-            tracing::error!(error = %e, "Spawn error");
-            msg
-        })?;
-
-    let pid = child.id().ok_or_else(|| {
-        let msg = "Failed to obtain socat PID".to_string();
-        tracing::error!(msg);
-        msg
-    })?;
-
-    tracing::debug!(
-        pid = pid,
-        local_port = local_port,
-        "Spawned socat process, waiting to verify it stays alive"
-    );
-
-    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
-
-    match child.try_wait() {
-        Ok(Some(status)) => {
-            let mut stderr_output = String::new();
-            if let Some(ref mut stderr) = child.stderr {
-                let _ = stderr.read_to_string(&mut stderr_output).await;
-            }
-            let stderr_output = stderr_output.trim().to_string();
-            let detail = if stderr_output.is_empty() {
-                format!("exit {status}")
-            } else {
-                format!("exit {status}: {stderr_output}")
-            };
-            let msg = format!("PID {pid} exited immediately — {detail}");
-            tracing::error!(pid = pid, exit_status = %status, stderr = %stderr_output, "socat exited immediately");
-            Err(msg)
-        }
-        Ok(None) => {
-            tracing::debug!(pid = pid, "socat process verified alive and active");
-
-            tokio::spawn(async move {
-                tracing::trace!(pid = pid, "Monitoring socat process wait status");
-                match child.wait().await {
-                    Ok(status) => {
-                        if status.success() {
-                            tracing::debug!(pid = pid, exit_status = %status, "socat process exited cleanly");
-                        } else {
-                            tracing::error!(pid = pid, exit_status = %status, "socat process exited with error");
-                        }
-                    }
-                    Err(e) => {
-                        tracing::error!(pid = pid, error = %e, "Error waiting for socat process")
-                    }
-                }
-            });
-
-            Ok(pid)
-        }
-        Err(e) => {
-            tracing::error!(pid = pid, error = %e, "Failed to try_wait socat process; killing it");
-            let _ = Command::new("kill")
-                .arg("-9")
-                .arg(format!("-{}", pid))
-                .output()
-                .await;
-            let msg = format!("Failed to check PID {pid} status: {e}");
-            Err(msg)
+impl std::fmt::Display for TunnelSpawnError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AddrInUse(port) => write!(f, "Port {port} is already in use on the system"),
+            Self::Other(msg) => write!(f, "{msg}"),
         }
     }
 }
 
-/// Kill a socat process AND all its children by targeting the Process Group (PGID).
-pub async fn kill_socat(pid: u32) -> Result<(), String> {
-    tracing::debug!(pid = pid, "Attempting to kill process group");
+static ACTIVE_TUNNELS: OnceLock<tokio::sync::Mutex<HashMap<u16, oneshot::Sender<()>>>> =
+    OnceLock::new();
 
-    let status = tokio::process::Command::new("sh")
-        .arg("-c")
-        .arg(format!("kill -9 -{}", pid))
-        .status()
+fn get_active_tunnels() -> &'static tokio::sync::Mutex<HashMap<u16, oneshot::Sender<()>>> {
+    ACTIVE_TUNNELS.get_or_init(|| tokio::sync::Mutex::new(HashMap::new()))
+}
+
+/// Spawn a TCP tunnel process that forwards `local_port` -> `target_host:target_port`.
+pub async fn spawn_tcp_tunnel(
+    local_port: u16,
+    target_host: &str,
+    target_port: u16,
+) -> Result<u32, TunnelSpawnError> {
+    let target_host_str = target_host.to_string();
+    tracing::debug!(
+        local_port = local_port,
+        target = %format!("{target_host_str}:{target_port}"),
+        "Spawning tunnel listener"
+    );
+
+    // Bind TCP listener synchronously before spawning.
+    // If the port is already in use or permission is denied, it fails immediately.
+    let listener = TcpListener::bind(("0.0.0.0", local_port))
         .await
         .map_err(|e| {
-            let msg = format!("Failed to execute shell kill for PGID {pid}: {e}");
-            tracing::error!(pid = pid, error = %e, "Failed to execute kill command");
-            msg
+            tracing::debug!(local_port = local_port, error = %e, "Bind error");
+            if e.kind() == std::io::ErrorKind::AddrInUse {
+                TunnelSpawnError::AddrInUse(local_port)
+            } else {
+                TunnelSpawnError::Other(format!("Failed to bind local port {local_port}: {e}"))
+            }
         })?;
 
-    if status.success() {
-        tracing::debug!(pid = pid, "Process group killed successfully");
+    let (shutdown_tx, mut shutdown_rx) = oneshot::channel::<()>();
+
+    let pid = local_port as u32;
+    {
+        let mut active = get_active_tunnels().lock().await;
+        if active.insert(local_port, shutdown_tx).is_some() {
+            tracing::warn!(
+                local_port = local_port,
+                "Replaced existing tunnel registration on this port"
+            );
+        }
+    }
+
+    tracing::debug!(
+        pid = pid,
+        local_port = local_port,
+        "tunnel spawned successfully"
+    );
+
+    tokio::spawn(async move {
+        tracing::trace!(local_port = local_port, "tunnel background loop started");
+
+        let (conn_shutdown_tx, _) = tokio::sync::broadcast::channel::<()>(1);
+
+        loop {
+            tokio::select! {
+                _ = &mut shutdown_rx => {
+                    tracing::trace!(local_port = local_port, "tunnel received shutdown signal");
+                    break;
+                }
+                accept_res = listener.accept() => {
+                    match accept_res {
+                        Ok((mut client_stream, client_addr)) => {
+                            tracing::trace!(
+                                local_port = local_port,
+                                client_addr = %client_addr,
+                                "Accepted client connection"
+                            );
+
+                            let target_host_clone = target_host_str.clone();
+                            let mut conn_shutdown_rx = conn_shutdown_tx.subscribe();
+
+                            tokio::spawn(async move {
+                                let target_addr = format!("{target_host_clone}:{target_port}");
+                                let mut target_stream = match tokio::net::TcpStream::connect(&target_addr).await {
+                                    Ok(s) => s,
+                                    Err(e) => {
+                                        tracing::trace!(
+                                            client_addr = %client_addr,
+                                            target_addr = %target_addr,
+                                            error = %e,
+                                            "Failed to connect to target host"
+                                        );
+                                        return;
+                                    }
+                                };
+
+                                tracing::trace!(
+                                    client_addr = %client_addr,
+                                    target_addr = %target_addr,
+                                    "Connected to target, starting bidirectional copy"
+                                );
+
+                                tokio::select! {
+                                    res = tokio::io::copy_bidirectional(&mut client_stream, &mut target_stream) => {
+                                        match res {
+                                            Ok((c2t, t2c)) => {
+                                                tracing::trace!(
+                                                    client_addr = %client_addr,
+                                                    c2t = c2t,
+                                                    t2c = t2c,
+                                                    "Connection closed normally"
+                                                );
+                                            }
+                                            Err(e) => {
+                                                tracing::trace!(
+                                                    client_addr = %client_addr,
+                                                    error = %e,
+                                                    "Connection error during copy"
+                                                );
+                                            }
+                                        }
+                                    }
+                                    _ = conn_shutdown_rx.recv() => {
+                                        tracing::trace!(
+                                            client_addr = %client_addr,
+                                            "Active connection shut down due to tunnel shutdown"
+                                        );
+                                    }
+                                }
+                            });
+                        }
+                        Err(e) => {
+                            tracing::trace!(local_port = local_port, error = %e, "Failed to accept connection");
+                        }
+                    }
+                }
+            }
+        }
+
+        let _ = conn_shutdown_tx.send(());
+        tracing::trace!(local_port = local_port, "tunnel background loop stopped");
+    });
+
+    Ok(pid)
+}
+
+/// Kill a TCP tunnel listener by local port (derived from mock pid).
+pub async fn kill_tunnel(pid: u32) -> Result<(), String> {
+    tracing::debug!(pid = pid, "Attempting to stop tunnel");
+
+    let local_port = pid as u16;
+    let mut active = get_active_tunnels().lock().await;
+    if let Some(shutdown_tx) = active.remove(&local_port) {
+        let _ = shutdown_tx.send(());
+        tracing::debug!(pid = pid, "Shutdown signal sent to tunnel");
     } else {
-        tracing::warn!(pid = pid, exit_status = %status, "kill command completed with non-zero status");
+        tracing::warn!(pid = pid, "No active tunnel found for this port");
     }
 
     Ok(())
 }
 
 /// Restore tunnels on boot: for each enabled tunnel whose port is free,
-/// attempt **once** to spawn socat.  If the spawn fails the tunnel is
+/// attempt **once** to spawn forwarder. If the spawn fails the tunnel is
 /// marked `enabled = false` so we never retry in an infinite loop.
 pub async fn restore_tunnels(state: &SharedState) {
     let mut tunnels = state.write().await;
@@ -177,9 +221,9 @@ pub async fn restore_tunnels(state: &SharedState) {
             name = %tunnel.name,
             local_port = tunnel.local_port,
             target = %format!("{}:{}", tunnel.target_host, tunnel.target_port),
-            "Spawning socat process for tunnel"
+            "Spawning tunnel process for tunnel"
         );
-        match spawn_socat(tunnel.local_port, &tunnel.target_host, tunnel.target_port).await {
+        match spawn_tcp_tunnel(tunnel.local_port, &tunnel.target_host, tunnel.target_port).await {
             Ok(pid) => {
                 tracing::debug!(
                     name = %tunnel.name,

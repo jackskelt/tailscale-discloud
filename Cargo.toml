@@ -2,7 +2,7 @@
 name = "tailscale-tunnel-manager"
 version = "0.1.2"
 edition = "2021"
-description = "TCP tunnel manager via socat for Tailscale containers"
+description = "TCP tunnel manager for Tailscale containers"
 license = "GPL-2.0-only"
 repository = "https://github.com/jackskelt/tailscale-discloud"
 homepage = "https://github.com/jackskelt/tailscale-discloud"
@@ -26,7 +26,6 @@ bytes = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-appender = "0.2"
-
 
 
 [profile.release]

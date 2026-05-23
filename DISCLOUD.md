@@ -21,7 +21,7 @@
 
 ## About
 
-Tailscale Tunnel Manager is a lightweight application that lets you create, manage, and monitor TCP tunnels inside a Tailscale-connected container. It exposes local ports on a Tailscale node and forwards traffic to arbitrary hosts and ports using [socat](https://linux.die.net/man/1/socat), all managed through a web interface and a REST API.
+Tailscale Tunnel Manager is a lightweight application that lets you create, manage, and monitor TCP tunnels inside a Tailscale-connected container. It exposes local ports on a Tailscale node and forwards traffic to arbitrary hosts and ports, all managed through a web interface and a REST API.
 
 The primary use case is running the manager on a Discloud container so that services deployed alongside it (databases, internal tools) become accessible over your Tailscale network without exposing them to the public internet.
 

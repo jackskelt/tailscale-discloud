@@ -14,7 +14,7 @@ use crate::net::reachability::{check_target_reachability, ReachabilityResult};
 use crate::net::utils::{is_loopback_host, is_port_available};
 
 use crate::storage::tunnels_json::save_tunnels;
-use crate::tunnels::service::{kill_socat, spawn_socat};
+use crate::tunnels::service::{kill_tunnel, spawn_tcp_tunnel};
 use crate::tunnels::{
     CreateTunnelRequest, SharedState, Tunnel, TunnelListItem, TunnelResponse, UpdateTunnelRequest,
 };
@@ -183,7 +183,7 @@ pub async fn create_tunnel(
 
     let mut warning: Option<ApiMessage> = None;
 
-    // ── Spawn socat if enabled (with reachability pre-check) ────────────
+    // ── Spawn tcp tunnel if enabled (with reachability pre-check) ────────────
     if tunnel.enabled {
         // Pre-flight reachability check
         match check_target_reachability(&tunnel.target_host, tunnel.target_port).await {
@@ -224,20 +224,26 @@ pub async fn create_tunnel(
             }
         }
 
-        match spawn_socat(tunnel.local_port, &tunnel.target_host, tunnel.target_port).await {
+        match spawn_tcp_tunnel(tunnel.local_port, &tunnel.target_host, tunnel.target_port).await {
             Ok(pid) => {
-                tracing::debug!("socat started for '{}' with PID {}", tunnel.name, pid);
+                tracing::debug!("tcp tunnel started for '{}' with PID {}", tunnel.name, pid);
                 tunnel.pid = Some(pid);
             }
             Err(e) => {
-                tracing::error!("socat failed for '{}': {e}", tunnel.name);
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(api_err_params(
-                        "api.error.socat_failed",
-                        params1("detail", e),
-                    )),
-                ));
+                let (status, err_body) = match e {
+                    crate::tunnels::service::TunnelSpawnError::AddrInUse(port) => (
+                        StatusCode::CONFLICT,
+                        api_err_params("api.error.port_in_use", params1("port", port)),
+                    ),
+                    crate::tunnels::service::TunnelSpawnError::Other(detail) => {
+                        tracing::error!("tcp tunnel failed for '{}': {detail}", tunnel.name);
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            api_err_params("api.error.tunnel_failed", params1("detail", detail)),
+                        )
+                    }
+                };
+                return Err((status, Json(err_body)));
             }
         }
     }
@@ -383,12 +389,12 @@ pub async fn update_tunnel(
         }
     }
 
-    // ── Kill old socat ──────────────────────────────────────────────────
+    // ── Kill old tunnel ──────────────────────────────────────────────────
     let old_pid = tunnel.pid;
     if let Some(pid) = old_pid {
-        tracing::debug!("Killing old socat PID {pid}");
-        if let Err(e) = kill_socat(pid).await {
-            tracing::error!("Failed to kill old socat PID {pid}: {e}");
+        tracing::debug!("Killing old tunnel PID {pid}");
+        if let Err(e) = kill_tunnel(pid).await {
+            tracing::error!("Failed to kill old tunnel PID {pid}: {e}");
         }
 
         // If the port didn't change, give the OS time to release it.
@@ -397,22 +403,26 @@ pub async fn update_tunnel(
         }
     }
 
-    // ── Spawn new socat if enabled ──────────────────────────────────────
+    // ── Spawn new tunnel if enabled ──────────────────────────────────────
     let new_pid = if new_enabled {
-        match spawn_socat(new_local_port, &new_target_host, new_target_port).await {
+        match spawn_tcp_tunnel(new_local_port, &new_target_host, new_target_port).await {
             Ok(pid) => {
-                tracing::debug!("socat started PID {pid}");
+                tracing::debug!("tunnel started PID {pid}");
                 Some(pid)
             }
             Err(e) => {
-                tracing::error!("socat failed: {e}");
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(api_err_params(
-                        "api.error.socat_failed",
-                        params1("detail", e),
-                    )),
-                ));
+                tracing::error!("tunnel failed: {e}");
+                let (status, err_body) = match e {
+                    crate::tunnels::service::TunnelSpawnError::AddrInUse(port) => (
+                        StatusCode::CONFLICT,
+                        api_err_params("api.error.port_in_use", params1("port", port)),
+                    ),
+                    crate::tunnels::service::TunnelSpawnError::Other(detail) => (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        api_err_params("api.error.tunnel_failed", params1("detail", detail)),
+                    ),
+                };
+                return Err((status, Json(err_body)));
             }
         }
     } else {
@@ -480,11 +490,11 @@ pub async fn delete_tunnel(
     let tunnel = &tunnels[index];
     let name = tunnel.name.clone();
 
-    // ── Kill socat ──────────────────────────────────────────────────────
+    // ── Kill tunnel ──────────────────────────────────────────────────────
     if let Some(pid) = tunnel.pid {
-        tracing::debug!("Killing socat PID {pid}");
-        if let Err(e) = kill_socat(pid).await {
-            tracing::error!("Failed to kill socat PID {pid}: {e}");
+        tracing::debug!("Killing tunnel PID {pid}");
+        if let Err(e) = kill_tunnel(pid).await {
+            tracing::error!("Failed to kill tunnel PID {pid}: {e}");
         }
     }
 

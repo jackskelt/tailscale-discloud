@@ -1,11 +1,9 @@
 {
   "header.title": "Gerenciador de Túneis",
   "header.subtitle": "Gerencie túneis TCP via Tailscale",
-
   "stats.total": "Total de Túneis",
   "stats.active": "Ativos",
   "stats.inactive": "Inativos",
-
   "form.title.create": "Novo Túnel",
   "form.title.edit": "Editar Túnel",
   "form.label.name": "Nome",
@@ -25,10 +23,8 @@
   "form.btn.create": "Criar Túnel",
   "form.btn.update": "Salvar Alterações",
   "form.btn.cancel": "Cancelar",
-
   "suggestions.title": "Modelos Rápidos",
   "suggestions.hint": "Clique em um modelo para preencher o formulário.",
-
   "tunnels.title": "Túneis Ativos",
   "tunnels.empty.title": "Nenhum túnel ainda",
   "tunnels.empty.text": "Crie seu primeiro túnel TCP usando o formulário acima para começar.",
@@ -40,7 +36,6 @@
   "tunnels.col.actions": "Ações",
   "tunnels.status.online": "Online",
   "tunnels.status.offline": "Offline",
-
   "actions.toggle.enable": "Ativar",
   "actions.toggle.disable": "Desativar",
   "actions.test": "Testar",
@@ -48,7 +43,6 @@
   "actions.delete": "Excluir",
   "actions.refresh": "Atualizar",
   "actions.copy": "Copiar para a área de transferência",
-
   "test.modal.title": "Teste de Conexão",
   "test.modal.testing": "Testando {host}:{port}",
   "test.modal.result": "Teste — {host}:{port}",
@@ -60,7 +54,6 @@
   "test.auto.title": "Resultado do Auto-Teste",
   "test.auto.success": "O túnel \"{name}\" está acessível.",
   "test.auto.failure": "O túnel \"{name}\" não conseguiu alcançar {host}:{port}.",
-
   "toast.tunnel.created": "Túnel \"{name}\" criado com sucesso",
   "toast.tunnel.updated": "Túnel \"{name}\" atualizado",
   "toast.tunnel.deleted": "Túnel \"{name}\" excluído",
@@ -74,22 +67,17 @@
   "toast.tunnel.testFail": "Teste falhou: {error}",
   "toast.suggestion.applied": "Modelo \"{name}\" aplicado — ajuste a porta local conforme necessário.",
   "toast.copied": "Copiado para a área de transferência",
-
   "confirm.delete": "Excluir túnel \"{name}\"? Isso irá parar o processo em execução.",
-
   "validation.nameRequired": "O nome é obrigatório.",
   "validation.targetHostRequired": "O host de destino é obrigatório.",
   "validation.localPortRange": "A porta local deve estar entre 1 e 65535.",
   "validation.targetPortRange": "A porta de destino deve estar entre 1 e 65535.",
   "validation.fillAll": "Por favor, preencha todos os campos obrigatórios.",
-
   "theme.toggle": "Alternar tema",
   "theme.light": "Claro",
   "theme.dark": "Escuro",
   "theme.system": "Sistema",
-
   "language.selector": "Idioma",
-
   "api.error.name_empty": "O nome do túnel não pode estar vazio.",
   "api.error.target_host_empty": "O host de destino não pode estar vazio.",
   "api.error.local_port_range": "A porta local deve estar entre 1 e 65535.",
@@ -98,10 +86,9 @@
   "api.error.port_assigned": "A porta {port} já está atribuída a outro túnel.",
   "api.error.tunnel_not_found": "Túnel com id \"{id}\" não encontrado.",
   "api.error.host_unreachable": "O host \"{host}\" está inacessível: {reason}",
-  "api.error.socat_failed": "Falha ao iniciar o processo do túnel: {detail}",
+  "api.error.tunnel_failed": "Falha ao iniciar o processo do túnel: {detail}",
   "api.error.self_loop": "Não é possível criar o túnel: a porta local {port} e a porta de destino são iguais em localhost. Isso criaria um loop infinito.",
   "api.warning.port_closed": "O host \"{host}\" está acessível, mas nada parece estar escutando na porta {port}. O túnel foi criado mesmo assim.",
-
   "footer.disclaimer": "Este projeto é independente e não possui qualquer afiliação, associação, autorização, endosso ou conexão oficial com a Tailscale Inc. ou qualquer uma de suas subsidiárias ou afiliadas. O nome \"Tailscale\" bem como marcas e logotipos relacionados são marcas registradas de seus respectivos proprietários.",
   "footer.source": "Código-fonte"
 }
