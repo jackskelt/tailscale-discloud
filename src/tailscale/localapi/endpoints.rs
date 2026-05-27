@@ -86,6 +86,18 @@ pub async fn start(opts: Options) -> Result<(), String> {
     Ok(())
 }
 
+/// Login interactive
+pub async fn login_interactive() -> Result<(), String> {
+    request(
+        hyper::Method::POST,
+        "/localapi/v0/login-interactive",
+        bytes::Bytes::new(),
+    )
+    .await?;
+
+    Ok(())
+}
+
 fn trim_trailing_dot(s: &str) -> &str {
     s.strip_suffix('.').unwrap_or(s)
 }

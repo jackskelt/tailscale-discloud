@@ -2,6 +2,7 @@ use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
+use crate::tailscale::localapi::endpoints::login_interactive;
 use crate::tailscale::localapi::{get_local_status, get_prefs, start, Options, Prefs};
 
 /// Spawn the `tailscaled` daemon as a child process
@@ -91,6 +92,7 @@ pub async fn init_tailscale_flow() -> Result<tokio::process::Child, String> {
     let auth_key = std::env::var("TAILSCALE_AUTHKEY")
         .ok()
         .filter(|s| !s.is_empty());
+    let need_login = auth_key.is_none();
 
     prefs.hostname = Some(hostname);
     prefs.route_all = Some(true);
@@ -106,11 +108,17 @@ pub async fn init_tailscale_flow() -> Result<tokio::process::Child, String> {
     tracing::debug!("Starting and configuring Tailscale via LocalAPI");
     start(opts).await?;
 
+    if need_login {
+        tracing::debug!("Triggering interactive login...");
+        login_interactive().await?;
+    }
+
     let mut last_state: Option<String> = None;
 
     loop {
         match get_local_status().await {
             Ok(status) => {
+                tracing::trace!("Tailscale status: {:#?}", &status);
                 let state = status.backend_state;
                 let state_changed = Some(&state) != last_state.as_ref();
                 if state_changed {
